@@ -1085,8 +1085,8 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
 
     // Main layout
     e('div',{className:'main'},
-      e(Sidebar),
-      e('div',{className:'content'},e(CurrentView))
+      Sidebar(),
+      e('div',{className:'content'},CurrentView())
     ),
 
     // Mobile bottom nav
