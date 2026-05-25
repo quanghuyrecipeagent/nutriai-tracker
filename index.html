@@ -198,6 +198,47 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 .toggle.on{background:var(--accent)}
 .toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:white;top:3px;left:3px;transition:left .2s}
 .toggle.on::after{left:19px}
+
+/* ── Mobile / iOS ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .header{padding:0 12px;height:48px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
+  .logo{font-size:18px}
+  .nav{display:none}
+  .header-right{gap:6px}
+  .hbtn{padding:4px 8px;font-size:11px}
+
+  .main{flex-direction:column}
+  .sidebar{width:100%;height:auto;border-right:none;border-bottom:1px solid var(--border);max-height:55vh}
+  .content{padding:12px;min-height:0}
+
+  .grid-2{grid-template-columns:1fr}
+  .micro-grid{grid-template-columns:1fr 1fr}
+
+  /* Bottom nav for mobile */
+  .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+  .mobile-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;font-size:9px;color:var(--text3);gap:3px;cursor:pointer;transition:color .15s;border:none;background:none;font-family:'DM Sans',sans-serif}
+  .mobile-nav-btn.active{color:var(--accent)}
+  .mobile-nav-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .content{padding-bottom:70px}
+
+  .section-title{font-size:18px;margin-bottom:14px}
+  .stat-big{font-size:26px}
+  .card{padding:14px}
+  .week-bar-wrap{height:70px}
+
+  .estimate-box{margin:16px;width:auto}
+  .confirm-box{margin:16px;width:auto}
+
+  .ai-chat-wrap{padding-bottom:8px}
+}
+@media (min-width: 769px) {
+  .mobile-nav{display:none}
+}
+/* Safe area for iPhone notch */
+@supports(padding-top: env(safe-area-inset-top)) {
+  .header{padding-top:env(safe-area-inset-top)}
+  body{padding-top:0}
+}
 </style>
 </head>
 <body>
@@ -284,6 +325,10 @@ function MealBar({entry,expanded,onToggle}) {
 // ── Pie Chart ──────────────────────────────────────────────────
 function PieChart({protein,carbs,fat}) {
   const ref=useRef(null),chart=useRef(null);
+  const toDisplay = (kg) => weightUnit==='lbs' ? Math.round(kg*2.20462*10)/10 : kg;
+  const toKg = (val) => weightUnit==='lbs' ? Math.round(val/2.20462*10)/10 : parseFloat(val);
+  const unitLabel = weightUnit==='lbs' ? 'lbs' : 'kg';
+
   useEffect(()=>{
     if(!ref.current)return;
     if(chart.current)chart.current.destroy();
@@ -397,6 +442,13 @@ function App({user,onLogout}) {
   const [aiChatLoading,setAiChatLoading]=useState(false);
   const [mealName,setMealName]=useState('');
   const [editingEntry,setEditingEntry]=useState(null); // {id, date, value}
+  const [editingMacro,setEditingMacro]=useState(null); // {id, date, field, value}
+  const [savedFoods,setSavedFoods]=useState([]);
+  const [showLibrary,setShowLibrary]=useState(false);
+  const [librarySearch,setLibrarySearch]=useState('');
+  const [showOverride,setShowOverride]=useState(false);
+  const [override,setOverride]=useState({calories:'',protein:'',carbs:'',fat:'',fiber:''});
+  const [weightUnit,setWeightUnit]=useState('kg'); // 'kg' | 'lbs'
   const logEndRef=useRef(null);
   const chatEndRef=useRef(null);
 
@@ -420,6 +472,8 @@ function App({user,onLogout}) {
         });
         setEntries(map);
       }
+      const {data:sf}=await sb.from('saved_foods').select('*').eq('user_id',user.id).order('use_count',{ascending:false});
+      if(sf)setSavedFoods(sf);
       const {data:ah}=await sb.from('ai_advice').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(10);
       if(ah)setAdviceHistory(ah);
       setSyncing(false);setInitDone(true);
@@ -482,14 +536,26 @@ All values must be numbers. Never return null.`;
       const food=JSON.parse(clean.slice(s,e+1));
       food.micros=food.micros||{};
 
+      // Apply manual overrides if any filled in
+      const applyOverride=(vals)=>{
+        const out={...vals};
+        Object.keys(override).forEach(k=>{if(override[k]!=='')out[k]=parseFloat(override[k]);});
+        return out;
+      };
       if(settings.estimateMode==='ask'){
+        // Bake overrides into all three estimates
+        food.under=applyOverride(food.under);
+        food.avg=applyOverride(food.avg);
+        food.over=applyOverride(food.over);
         setPendingFood(food);
       } else {
         const choice=settings.estimateMode==='under'?food.under:settings.estimateMode==='over'?food.over:food.avg;
+        const finalVals=applyOverride(choice);
         const finalName=mealName.trim()||food.name;
         const desc=mealName.trim()?food.name:'';
-        await saveEntry({name:finalName,description:desc,...choice,micros:food.micros});
+        await saveEntry({name:finalName,description:desc,...finalVals,micros:food.micros});
         setMealName('');
+        setOverride({calories:'',protein:'',carbs:'',fat:'',fiber:''});
       }
     } catch(err){
       console.error('handleSend error:',err);
@@ -528,6 +594,41 @@ All values must be numbers. Never return null.`;
     setEntries(prev=>({...prev,[date]:(prev[date]||[]).filter(e=>e.id!==id)}));
   }
 
+  async function saveToLibrary(entry){
+    // Check if already saved (by name match)
+    const existing=savedFoods.find(f=>f.name.toLowerCase()===entry.name.toLowerCase());
+    if(existing){
+      // Increment use_count
+      await sb.from('saved_foods').update({use_count:existing.use_count+1,updated_at:new Date().toISOString()}).eq('id',existing.id);
+      setSavedFoods(prev=>prev.map(f=>f.id===existing.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
+      return;
+    }
+    const row={user_id:user.id,name:entry.name,description:entry.description||'',calories:Math.round(entry.calories||0),protein:Math.round(entry.protein||0),carbs:Math.round(entry.carbs||0),fat:Math.round(entry.fat||0),fiber:Math.round(entry.fiber||0),micros:entry.micros||{}};
+    const {data:saved}=await sb.from('saved_foods').insert(row).select().single();
+    if(saved)setSavedFoods(prev=>[saved,...prev]);
+  }
+
+  async function logFromLibrary(food){
+    await saveEntry({name:food.name,description:food.description||'',calories:food.calories,protein:food.protein,carbs:food.carbs,fat:food.fat,fiber:food.fiber,micros:food.micros||{}});
+    // Increment use count
+    await sb.from('saved_foods').update({use_count:food.use_count+1,updated_at:new Date().toISOString()}).eq('id',food.id);
+    setSavedFoods(prev=>prev.map(f=>f.id===food.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
+    setShowLibrary(false);
+    setView('today');
+  }
+
+  async function deleteFromLibrary(id){
+    await sb.from('saved_foods').delete().eq('id',id).eq('user_id',user.id);
+    setSavedFoods(prev=>prev.filter(f=>f.id!==id));
+  }
+
+  async function updateEntryMacro(date,id,field,value){
+    const num=Math.round(parseFloat(value)||0);
+    await sb.from('food_entries').update({[field]:num,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
+    setEntries(prev=>({...prev,[date]:(prev[date]||[]).map(e=>e.id===id?{...e,[field]:num}:e)}));
+    setEditingMacro(null);
+  }
+
   async function updateEntryName(date,id,newName){
     if(!newName.trim())return;
     await sb.from('food_entries')
@@ -545,7 +646,13 @@ All values must be numbers. Never return null.`;
 
   async function saveGoals(){
     const updated={...goals};
-    Object.keys(goalInput).forEach(k=>{const v=parseFloat(goalInput[k]);if(!isNaN(v))updated[k]=v;});
+    Object.keys(goalInput).forEach(k=>{
+      const v=parseFloat(goalInput[k]);
+      if(!isNaN(v)){
+        const isWeight=k==='weight'||k==='target_weight';
+        updated[k]=isWeight?toKg(v):v;
+      }
+    });
     setGoals(updated);setGoalInput({});
     await sb.from('goals').upsert({user_id:user.id,...updated},{onConflict:'user_id'});
   }
@@ -630,6 +737,38 @@ User's data:
 
   return React.createElement('div',{className:'app'},
     pendingFood&&React.createElement(EstimateDialog,{food:pendingFood,onChoose:handleEstimateChoice}),
+    showLibrary&&React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.85)',zIndex:200,display:'flex',alignItems:'flex-end',justifyContent:'center'},onClick:()=>setShowLibrary(false)},
+      React.createElement('div',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--radius) var(--radius) 0 0',width:'100%',maxWidth:'500px',maxHeight:'80vh',display:'flex',flexDirection:'column',padding:'20px'},onClick:e=>e.stopPropagation()},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
+          React.createElement('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'18px'}},'My food library'),
+          React.createElement('button',{onClick:()=>setShowLibrary(false),style:{fontSize:'16px',color:'var(--text3)',cursor:'pointer'}},'✕')
+        ),
+        React.createElement('input',{type:'text',placeholder:'Search saved foods…',value:librarySearch,onChange:e=>setLibrarySearch(e.target.value),style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'8px 12px',color:'var(--text)',fontSize:'13px',outline:'none',marginBottom:'12px',width:'100%'}}),
+        React.createElement('div',{style:{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:'7px'}},
+          savedFoods.length===0
+            ? React.createElement('div',{className:'empty-state'},React.createElement('div',{className:'empty-icon'},'📚'),'No saved foods yet','',React.createElement('div',{style:{marginTop:'6px',fontSize:'11px'}},'Log a food and tap "+ save to library"'))
+            : savedFoods
+                .filter(f=>!librarySearch||f.name.toLowerCase().includes(librarySearch.toLowerCase()))
+                .map(food=>React.createElement('div',{key:food.id,style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px 12px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}},
+                  React.createElement('div',{style:{flex:1,minWidth:0}},
+                    React.createElement('div',{style:{fontSize:'13px',fontWeight:500,color:'var(--text)',marginBottom:'3px'}},food.name),
+                    food.description&&React.createElement('div',{style:{fontSize:'10px',color:'var(--text3)',marginBottom:'3px',fontStyle:'italic'}},food.description),
+                    React.createElement('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap'}},
+                      React.createElement('span',{className:'mp cal'},(food.calories||0)+' kcal'),
+                      React.createElement('span',{className:'mp p'},'P '+(food.protein||0)+'g'),
+                      React.createElement('span',{className:'mp c'},'C '+(food.carbs||0)+'g'),
+                      React.createElement('span',{className:'mp f'},'F '+(food.fat||0)+'g'),
+                      food.use_count>1&&React.createElement('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 5px'}},'×'+food.use_count)
+                    )
+                  ),
+                  React.createElement('div',{style:{display:'flex',gap:'6px',flexShrink:0}},
+                    React.createElement('button',{onClick:()=>logFromLibrary(food),style:{padding:'6px 12px',background:'var(--accent)',color:'#0a0a08',border:'none',borderRadius:'var(--radius-sm)',fontSize:'12px',fontWeight:700,cursor:'pointer'}},'Log'),
+                    React.createElement('button',{onClick:()=>deleteFromLibrary(food.id),style:{padding:'6px 8px',background:'rgba(224,48,48,.1)',color:'var(--danger)',border:'1px solid rgba(224,48,48,.2)',borderRadius:'var(--radius-sm)',fontSize:'12px',cursor:'pointer'}},'✕')
+                  )
+                ))
+        )
+      )
+    ),
     showConfirm&&React.createElement(ConfirmDialog,{title:'Clear all data?',text:'Permanently deletes all food entries and AI advice from your account.',onYes:clearAll,onNo:()=>setShowConfirm(false)}),
 
     // HEADER
@@ -650,6 +789,18 @@ User's data:
       )
     ),
 
+    React.createElement('nav',{className:'mobile-nav'},
+      [
+        {id:'today',label:'Today',icon:'🍽'},
+        {id:'week',label:'Week',icon:'📊'},
+        {id:'chat',label:'Chat',icon:'💬'},
+        {id:'goals',label:'Goals',icon:'🎯'},
+        {id:'settings',label:'More',icon:'⚙️'},
+      ].map(t=>React.createElement('button',{key:t.id,className:'mobile-nav-btn'+(view===t.id?' active':''),onClick:()=>setView(t.id)},
+        React.createElement('span',{style:{fontSize:'16px'}},t.icon),
+        t.label
+      ))
+    ),
     React.createElement('main',{className:'main'},
 
       // SIDEBAR
@@ -666,6 +817,21 @@ User's data:
               React.createElement('div',{className:'chat-wrap'},
                   React.createElement('textarea',{className:'chat-textarea',placeholder:'e.g. "2 eggs in butter" or "McDonald\'s Meal 2" or "i had a big mac"',value:input,onChange:e=>setInput(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}},rows:2}),
                   React.createElement('button',{className:'send-btn',onClick:handleSend,disabled:loading||!input.trim()},loading?'…':'↑')
+                ),
+                React.createElement('div',{style:{display:'flex',gap:'6px',marginTop:'6px'}},
+                  React.createElement('button',{onClick:()=>setShowOverride(p=>!p),style:{fontSize:'11px',color:showOverride?'var(--accent)':'var(--text3)',background:'var(--surface2)',border:'1px solid '+(showOverride?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'5px',padding:'4px 8px',cursor:'pointer',transition:'all .15s'}},'⚙ Override macros'),
+                  React.createElement('button',{onClick:()=>setShowLibrary(true),style:{fontSize:'11px',color:'var(--text3)',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',transition:'all .15s'},onMouseEnter:e=>e.target.style.color='var(--accent)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'📚 My foods')
+                ),
+                showOverride&&React.createElement('div',{style:{marginTop:'8px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px'}},
+                  React.createElement('div',{style:{fontSize:'10px',color:'var(--text3)',marginBottom:'7px',textTransform:'uppercase',letterSpacing:'.05em'}},'Override AI values (leave blank to use AI estimate)'),
+                  React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px'}},
+                    [['calories','kcal'],['protein','P (g)'],['carbs','C (g)'],['fat','F (g)'],['fiber','Fi (g)']].map(([k,label])=>
+                      React.createElement('div',{key:k,style:{display:'flex',flexDirection:'column',gap:'3px'}},
+                        React.createElement('label',{style:{fontSize:'10px',color:'var(--text3)'}},label),
+                        React.createElement('input',{type:'number',placeholder:'auto',value:override[k],onChange:e=>setOverride(p=>({...p,[k]:e.target.value})),style:{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'5px',padding:'5px 8px',color:'var(--text)',fontSize:'12px',outline:'none',width:'100%'}})
+                      )
+                    )
+                  )
                 ),
                 React.createElement('p',{className:'hint'},'AI estimates macros — restaurant meals, recipes, anything')
               )
@@ -834,11 +1000,21 @@ User's data:
         view==='goals'&&React.createElement('div',null,
           React.createElement('h1',{className:'section-title'},'Goals & profile'),
           React.createElement('div',{className:'card',style:{marginBottom:'14px'}},
-            React.createElement('div',{className:'card-title'},'Body stats'),
-            React.createElement('div',{className:'grid-2',style:{gap:'10px'}},
-              [['weight','Current weight (kg)',goals.weight],['target_weight','Target weight (kg)',goals.target_weight],['body_fat','Current body fat (%)',goals.body_fat],['target_body_fat','Target body fat (%)',goals.target_body_fat]].map(([k,label,val])=>
-                React.createElement('div',{key:k,className:'goal-row'},React.createElement('label',null,label),React.createElement('input',{type:'number',placeholder:String(val),value:goalInput[k]!==undefined?goalInput[k]:'',onChange:e=>setGoalInput(p=>({...p,[k]:e.target.value}))}))
+            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
+              React.createElement('div',{className:'card-title',style:{margin:0}},'Body stats'),
+              React.createElement('div',{style:{display:'flex',gap:'2px',background:'var(--surface3)',padding:'3px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)'}},
+                ['kg','lbs'].map(u=>React.createElement('button',{key:u,onClick:()=>setWeightUnit(u),style:{padding:'3px 10px',borderRadius:'5px',fontSize:'11px',fontWeight:600,border:'none',cursor:'pointer',background:weightUnit===u?'var(--accent)':'transparent',color:weightUnit===u?'#0a0a08':'var(--text3)',transition:'all .15s'}},u))
               )
+            ),
+            React.createElement('div',{className:'grid-2',style:{gap:'10px'}},
+              [['weight','Current weight'],['target_weight','Target weight'],['body_fat','Body fat (%)'],['target_body_fat','Target body fat (%)']].map(([k,label])=>{
+                const isWeight=k==='weight'||k==='target_weight';
+                const displayVal=isWeight?toDisplay(goals[k]):goals[k];
+                return React.createElement('div',{key:k,className:'goal-row'},
+                  React.createElement('label',null,label+(isWeight?' ('+unitLabel+')':' (%)')),
+                  React.createElement('input',{type:'number',placeholder:String(displayVal),value:goalInput[k]!==undefined?goalInput[k]:'',onChange:e=>setGoalInput(p=>({...p,[k]:e.target.value}))})
+                );
+              })
             )
           ),
           React.createElement('div',{className:'card',style:{marginBottom:'14px'}},
@@ -853,7 +1029,7 @@ User's data:
           React.createElement('div',{className:'card'},
             React.createElement('div',{className:'card-title'},'Active goals'),
             React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:'8px'}},
-              [['⚡',goals.calories+' kcal/day','#ff6b1a'],['🥩',goals.protein+'g protein','#ff6b1a'],['🌾',goals.carbs+'g carbs','#f0b429'],['🥑',goals.fat+'g fat','#e08c3a'],['⚖️',goals.weight+'→'+goals.target_weight+'kg','var(--text2)'],['💪',goals.body_fat+'%→'+goals.target_body_fat+'% BF','var(--text2)']].map(([icon,label,color])=>
+              [['⚡',goals.calories+' kcal/day','#ff6b1a'],['🥩',goals.protein+'g protein','#ff6b1a'],['🌾',goals.carbs+'g carbs','#f0b429'],['🥑',goals.fat+'g fat','#e08c3a'],['⚖️',toDisplay(goals.weight)+'→'+toDisplay(goals.target_weight)+unitLabel,'var(--text2)'],['💪',goals.body_fat+'%→'+goals.target_body_fat+'% BF','var(--text2)']].map(([icon,label,color])=>
                 React.createElement('div',{key:label,style:{display:'flex',alignItems:'center',gap:'5px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'7px 11px',fontSize:'12px',color}},icon,' ',label)
               )
             )
@@ -907,6 +1083,17 @@ User's data:
                       React.createElement('div',{style:{display:'flex',gap:'7px',alignItems:'center',flexShrink:0,marginLeft:'8px'}},
                         React.createElement('span',{style:{color:'var(--text2)',fontSize:'12px'}},entry.calories+' kcal'),
                         React.createElement('button',{onClick:()=>deleteEntry(date,entry.id),style:{fontSize:'11px',color:'var(--text3)',cursor:'pointer'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
+                      )
+                    ),
+                    React.createElement('div',{style:{display:'flex',gap:'5px',marginTop:'5px',flexWrap:'wrap'}},
+                      [['calories','kcal','cal'],['protein','g','p'],['carbs','g','c'],['fat','g','f'],['fiber','g','fi']].map(([field,unit,cls])=>
+                        editingMacro&&editingMacro.id===entry.id&&editingMacro.field===field
+                          ? React.createElement('div',{key:field,style:{display:'flex',alignItems:'center',gap:'3px'}},
+                              React.createElement('input',{autoFocus:true,type:'number',value:editingMacro.value,onChange:e=>setEditingMacro(p=>({...p,value:e.target.value})),onKeyDown:e=>{if(e.key==='Enter')updateEntryMacro(date,entry.id,field,editingMacro.value);if(e.key==='Escape')setEditingMacro(null);},onBlur:()=>updateEntryMacro(date,entry.id,field,editingMacro.value),style:{width:'60px',background:'var(--surface3)',border:'1px solid var(--accent)',borderRadius:'4px',padding:'2px 5px',color:'var(--text)',fontSize:'11px',outline:'none'}})
+                            )
+                          : React.createElement('span',{key:field,className:'mp '+cls,title:'Click to edit',style:{cursor:'pointer'},onClick:()=>setEditingMacro({id:entry.id,date,field,value:String(entry[field]||0)})},
+                              field==='calories'?(entry.calories||0)+' kcal':(field==='protein'?'P ':(field==='carbs'?'C ':(field==='fat'?'F ':'Fi ')))+(entry[field]||0)+'g'
+                            )
                       )
                     ),
                     settings.showMealBars&&React.createElement(MealBar,{entry,expanded:false,onToggle:()=>{}})
@@ -964,7 +1151,8 @@ User's data:
       )
     )
   );
-}
+
+  // mobile nav inline below
 
 // ── Root ───────────────────────────────────────────────────────
 function Root() {
