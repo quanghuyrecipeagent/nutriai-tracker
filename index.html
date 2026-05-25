@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GRAMS — Macro Tracker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -18,226 +18,226 @@
   --protein:#ff6b1a;--carbs:#f0b429;--fat:#e08c3a;--fiber:#c97a30;
   --danger:#e03030;--radius:12px;--radius-sm:8px;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;-webkit-text-size-adjust:100%}
 button{font-family:'DM Sans',sans-serif;cursor:pointer;border:none;background:none}
 input,textarea,select{font-family:'DM Sans',sans-serif}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes bob{0%,100%{transform:translateY(0);opacity:.4}50%{transform:translateY(-4px);opacity:1}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-.auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 0%,rgba(255,107,26,.08) 0%,transparent 60%)}
-.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:40px;width:100%;max-width:400px}
+/* ── Auth ── */
+.auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 0%,rgba(255,107,26,.08),transparent 60%)}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:36px;width:100%;max-width:400px}
 .auth-logo{font-family:'DM Serif Display',serif;font-size:34px;color:var(--accent);text-align:center;margin-bottom:4px;letter-spacing:-1px}
-.auth-tagline{text-align:center;font-size:13px;color:var(--text3);margin-bottom:32px}
-.auth-tabs{display:flex;gap:2px;background:var(--surface2);padding:3px;border-radius:var(--radius-sm);margin-bottom:24px;border:1px solid var(--border)}
+.auth-tagline{text-align:center;font-size:13px;color:var(--text3);margin-bottom:28px}
+.auth-tabs{display:flex;gap:2px;background:var(--surface2);padding:3px;border-radius:var(--radius-sm);margin-bottom:20px;border:1px solid var(--border)}
 .auth-tab{flex:1;padding:8px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);text-align:center;cursor:pointer;transition:all .15s}
 .auth-tab.active{background:var(--surface);color:var(--text)}
-.auth-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.auth-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
 .auth-field label{font-size:12px;color:var(--text3)}
-.auth-field input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border-color .15s}
+.auth-field input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border-color .15s;-webkit-appearance:none}
 .auth-field input:focus{border-color:var(--accent)}
-.auth-btn{width:100%;padding:12px;border-radius:var(--radius-sm);background:var(--accent);color:#0a0a08;font-size:14px;font-weight:700;margin-top:8px;transition:all .15s}
+.auth-btn{width:100%;padding:12px;border-radius:var(--radius-sm);background:var(--accent);color:#0a0a08;font-size:14px;font-weight:700;margin-top:6px;transition:all .15s;-webkit-appearance:none}
 .auth-btn:hover{background:var(--accent2)}
-.auth-btn:disabled{opacity:.4;cursor:default}
-.auth-error{font-size:12px;color:var(--danger);text-align:center;margin-top:10px}
+.auth-btn:disabled{opacity:.4}
+.auth-msg{font-size:12px;text-align:center;margin-top:10px}
 
-.app{min-height:100vh;display:flex;flex-direction:column}
-.header{border-bottom:1px solid var(--border);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
-.logo{font-family:'DM Serif Display',serif;font-size:20px;color:var(--accent)}
-.nav{display:flex;gap:2px}
+/* ── App shell ── */
+.app{min-height:100vh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+.header{border-bottom:1px solid var(--border);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;background:var(--surface);position:sticky;top:0;z-index:50;padding-top:env(safe-area-inset-top)}
+.logo{font-family:'DM Serif Display',serif;font-size:20px;color:var(--accent);letter-spacing:-.5px}
+.nav-desktop{display:flex;gap:2px}
 .nav-btn{padding:5px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--text2);transition:all .15s}
 .nav-btn:hover{color:var(--text);background:var(--surface2)}
 .nav-btn.active{color:var(--accent);background:var(--accent-dim)}
-.header-right{display:flex;align-items:center;gap:8px}
 .hbtn{padding:5px 10px;border-radius:var(--radius-sm);font-size:12px;color:var(--text2);border:1px solid var(--border);transition:all .15s}
-.hbtn:hover{color:var(--text);border-color:var(--border2)}
-.hbtn.active{color:var(--accent);border-color:rgba(255,107,26,.3)}
-.hbtn.danger:hover{color:var(--danger);border-color:rgba(224,48,48,.3)}
-.spinner-sm{width:10px;height:10px;border:1.5px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+.hbtn:hover{color:var(--text)}
+.hbtn.red:hover{color:var(--danger);border-color:rgba(224,48,48,.3)}
 .syncing{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px}
+.spinner-sm{width:9px;height:9px;border:1.5px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 
-.main{flex:1;display:flex}
-.sidebar{width:310px;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;height:calc(100vh - 52px);overflow:hidden}
+/* ── Mobile bottom nav ── */
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:50;padding-bottom:env(safe-area-inset-bottom)}
+.mnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 2px 6px;font-size:9px;font-weight:500;color:var(--text3);gap:3px;cursor:pointer;transition:color .15s;border:none;background:none;font-family:'DM Sans',sans-serif}
+.mnav-btn.active{color:var(--accent)}
+.mnav-icon{font-size:18px;line-height:1}
+
+/* ── Layout ── */
+.main{flex:1;display:flex;overflow:hidden;height:calc(100vh - 52px)}
+.sidebar{width:300px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden}
 .content{flex:1;overflow-y:auto;padding:20px}
 
-/* Input area */
-.sidebar-top{padding:12px;border-bottom:1px solid var(--border)}
-.input-mode-tabs{display:flex;gap:2px;margin-bottom:10px;background:var(--surface2);padding:3px;border-radius:var(--radius-sm);border:1px solid var(--border)}
-.input-mode-tab{flex:1;padding:5px;border-radius:5px;font-size:11px;font-weight:500;color:var(--text3);text-align:center;cursor:pointer;transition:all .15s}
-.input-mode-tab.active{background:var(--surface);color:var(--accent)}
-.chat-wrap{display:flex;gap:6px;align-items:flex-end}
-.chat-textarea{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;color:var(--text);font-size:13px;resize:none;min-height:38px;max-height:100px;outline:none;transition:border-color .15s;line-height:1.5}
-.chat-textarea:focus{border-color:var(--border2)}
+/* ── Sidebar input ── */
+.sidebar-top{padding:12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.mode-tabs{display:flex;gap:2px;background:var(--surface2);padding:3px;border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:10px}
+.mode-tab{flex:1;padding:5px;border-radius:5px;font-size:11px;font-weight:500;color:var(--text3);text-align:center;cursor:pointer;transition:all .15s}
+.mode-tab.active{background:var(--surface);color:var(--accent)}
+.meal-name-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:12px;outline:none;transition:border-color .15s;margin-bottom:7px;-webkit-appearance:none}
+.meal-name-input:focus{border-color:var(--accent)}
+.chat-row{display:flex;gap:6px;align-items:flex-end}
+.chat-ta{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;color:var(--text);font-size:13px;resize:none;min-height:38px;max-height:100px;outline:none;line-height:1.5;-webkit-appearance:none}
+.chat-ta:focus{border-color:var(--border2)}
 .send-btn{width:34px;height:34px;border-radius:var(--radius-sm);background:var(--accent);color:#0a0a08;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
 .send-btn:hover{background:var(--accent2)}
-.send-btn:disabled{opacity:.4;cursor:default}
-.hint{font-size:11px;color:var(--text3);margin-top:6px;line-height:1.4}
-
-/* Manual macro inputs */
+.send-btn:disabled{opacity:.4}
+.hint{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.4}
+.sub-btns{display:flex;gap:5px;margin-top:6px}
+.sub-btn{font-size:11px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:4px 8px;cursor:pointer;transition:all .15s}
+.sub-btn:hover{color:var(--text);border-color:var(--border2)}
+.sub-btn.on{color:var(--accent);border-color:rgba(255,107,26,.3)}
+.override-panel{margin-top:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px}
+.override-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+.override-field{display:flex;flex-direction:column;gap:3px}
+.override-field label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em}
+.override-field input{background:var(--surface3);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text);font-size:12px;outline:none;width:100%;-webkit-appearance:none}
 .manual-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
 .manual-field{display:flex;flex-direction:column;gap:3px}
-.manual-field label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
-.manual-field input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s;width:100%}
+.manual-field label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em}
+.manual-field input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 9px;color:var(--text);font-size:13px;outline:none;width:100%;-webkit-appearance:none}
 .manual-field input:focus{border-color:var(--accent)}
-.manual-name{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
-.manual-name label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
-.manual-name input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;outline:none;transition:border-color .15s;width:100%}
-.manual-name input:focus{border-color:var(--accent)}
 .add-btn{width:100%;padding:9px;border-radius:var(--radius-sm);background:var(--accent);color:#0a0a08;font-size:13px;font-weight:700;transition:all .15s}
-.add-btn:hover{background:var(--accent2)}
 
-/* Log */
+/* ── Log ── */
 .log{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
 .log-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px;animation:fadeIn .2s ease}
-.log-item-header{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+.log-header{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
 .log-name{font-size:13px;font-weight:500;color:var(--text);line-height:1.3}
+.log-desc{font-size:10px;color:var(--text3);margin-top:2px;font-style:italic;line-height:1.3}
 .log-time{font-size:10px;color:var(--text3);flex-shrink:0}
-.log-macros{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
-.mp{font-size:11px;font-weight:500;padding:2px 6px;border-radius:3px}
+.log-del{opacity:0;font-size:10px;color:var(--text3);cursor:pointer;padding:2px 4px;transition:opacity .15s}
+.log-item:hover .log-del{opacity:1}
+.log-del:hover{color:var(--danger)}
+.log-pills{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.mp{font-size:11px;font-weight:500;padding:2px 6px;border-radius:3px;cursor:default}
 .mp.cal{background:rgba(255,107,26,.12);color:var(--accent)}
 .mp.p{background:rgba(255,107,26,.15);color:var(--protein)}
 .mp.c{background:rgba(240,180,41,.15);color:var(--carbs)}
 .mp.f{background:rgba(224,140,58,.15);color:var(--fat)}
 .mp.fi{background:rgba(201,122,48,.15);color:var(--fiber)}
-.log-del{opacity:0;font-size:10px;color:var(--text3);transition:opacity .15s;cursor:pointer;padding:2px 4px}
-.log-item:hover .log-del{opacity:1}
-.log-del:hover{color:var(--danger)}
-
-/* Meal visual bar */
-.meal-bar-wrap{margin-top:7px;cursor:pointer}
-.meal-bar{height:5px;border-radius:3px;display:flex;overflow:hidden;gap:1px}
-.meal-bar-seg{height:100%;transition:width .4s ease}
-.meal-bar-detail{margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
-.meal-bar-label{font-size:10px;display:flex;align-items:center;gap:4px}
+.log-save-btn{font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer;padding:0;margin-top:3px;transition:color .15s}
+.log-save-btn:hover{color:var(--accent)}
+.meal-bar{height:4px;border-radius:2px;display:flex;overflow:hidden;gap:1px;margin-top:6px;cursor:pointer}
+.meal-bar-seg{height:100%}
+.meal-bar-detail{display:flex;gap:8px;margin-top:5px;flex-wrap:wrap}
+.meal-bar-lbl{font-size:10px;display:flex;align-items:center;gap:3px;color:var(--text2)}
 .meal-bar-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
 
-/* Loading */
-.loading-bubble{display:flex;gap:4px;align-items:center;padding:4px 0}
-.loading-bubble span{width:4px;height:4px;border-radius:50%;background:var(--accent);animation:bob 1s ease-in-out infinite}
-.loading-bubble span:nth-child(2){animation-delay:.2s}
-.loading-bubble span:nth-child(3){animation-delay:.4s}
+/* ── Loading ── */
+.bubble{display:flex;gap:4px;align-items:center;padding:4px 0}
+.bubble span{width:4px;height:4px;border-radius:50%;background:var(--accent);animation:bob 1s ease-in-out infinite}
+.bubble span:nth-child(2){animation-delay:.2s}
+.bubble span:nth-child(3){animation-delay:.4s}
 
-/* Estimate dialog */
-.estimate-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:999}
-.estimate-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:360px;width:90%;animation:fadeIn .2s ease}
-.estimate-title{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:6px}
-.estimate-food{font-size:13px;color:var(--accent);margin-bottom:4px;font-weight:500}
-.estimate-macros{font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.6}
-.estimate-btns{display:flex;gap:8px}
-.ebtn{flex:1;padding:10px 6px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-align:center;transition:all .15s;border:1px solid var(--border)}
-.ebtn.under{background:rgba(240,180,41,.1);color:var(--carbs);border-color:rgba(240,180,41,.2)}
-.ebtn.under:hover{background:rgba(240,180,41,.2)}
-.ebtn.avg{background:rgba(255,107,26,.1);color:var(--accent);border-color:rgba(255,107,26,.2)}
-.ebtn.avg:hover{background:rgba(255,107,26,.2)}
-.ebtn.over{background:rgba(224,48,48,.1);color:var(--danger);border-color:rgba(224,48,48,.2)}
-.ebtn.over:hover{background:rgba(224,48,48,.2)}
-
-/* Confirm */
-.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:999}
-.confirm-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:320px;text-align:center}
-.confirm-title{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:8px}
-.confirm-text{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.5}
-.confirm-btns{display:flex;gap:10px;justify-content:center}
-.confirm-yes{padding:8px 20px;border-radius:var(--radius-sm);background:var(--danger);color:white;font-size:13px;font-weight:500}
-.confirm-no{padding:8px 20px;border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:13px;font-weight:500;border:1px solid var(--border)}
-
-/* Cards */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px}
 .card-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:14px;font-weight:500}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.stat-big{font-family:'DM Serif Display',serif;font-size:34px;line-height:1;color:var(--text)}
-.stat-unit{font-size:13px;color:var(--text2);margin-left:4px}
-.progress-bar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:7px}
-.progress-fill{height:100%;border-radius:3px;transition:width .5s ease}
-.macro-row{display:flex;flex-direction:column;gap:5px}
-.macro-label-row{display:flex;justify-content:space-between;align-items:baseline}
+.stat-big{font-family:'DM Serif Display',serif;font-size:32px;line-height:1}
+.stat-unit{font-size:12px;color:var(--text2);margin-left:3px}
+.pbar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:6px}
+.pfill{height:100%;border-radius:3px;transition:width .5s}
+.macro-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.macro-lrow{display:flex;justify-content:space-between;align-items:baseline}
 .macro-name{font-size:13px;font-weight:500}
 .macro-vals{font-size:12px;color:var(--text2)}
-.section-title{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:18px;color:var(--text)}
+.section-title{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:16px}
 .save-btn{padding:9px 18px;border-radius:var(--radius-sm);background:var(--accent);color:#0a0a08;font-size:13px;font-weight:700;transition:all .15s}
 .save-btn:hover{background:var(--accent2)}
-.ai-advice{background:var(--accent-dim);border:1px solid rgba(255,107,26,.2);border-radius:var(--radius);padding:14px;font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
-.ai-header{font-size:11px;color:var(--accent);font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
-.week-bar-wrap{display:flex;gap:3px;align-items:flex-end;height:80px}
-.week-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
-.week-bar{width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:height .4s ease}
-.day-label{font-size:10px;color:var(--text3)}
-.goal-row{display:flex;flex-direction:column;gap:5px}
+.ai-box{background:var(--accent-dim);border:1px solid rgba(255,107,26,.2);border-radius:var(--radius);padding:14px;font-size:13px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
+.ai-hdr{font-size:11px;color:var(--accent);font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.week-bars{display:flex;gap:3px;align-items:flex-end;height:76px}
+.wbar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.wbar{width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:height .4s}
+.wbar-label{font-size:9px;color:var(--text3)}
+.goal-row{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
 .goal-row label{font-size:12px;color:var(--text3)}
-.goal-row input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 11px;color:var(--text);font-size:13px;outline:none;width:100%;transition:border-color .15s}
+.goal-row input{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 11px;color:var(--text);font-size:13px;outline:none;width:100%;-webkit-appearance:none}
 .goal-row input:focus{border-color:var(--accent)}
-.goal-row select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 11px;color:var(--text);font-size:13px;outline:none;width:100%}
-.empty-state{text-align:center;padding:36px 16px;color:var(--text3);font-size:13px}
+.empty{text-align:center;padding:32px 16px;color:var(--text3);font-size:13px}
 .empty-icon{font-size:28px;margin-bottom:8px;opacity:.5}
-.log-item:hover .edit-icon,.history-row:hover .edit-icon{opacity:1!important}
 .micro-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .micro-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 11px}
 .micro-name{font-size:10px;color:var(--text3);margin-bottom:2px}
-.micro-val{font-size:14px;font-weight:500;color:var(--text)}
-.micro-goal-bar{height:3px;background:var(--surface3);border-radius:2px;margin-top:5px;overflow:hidden}
-.micro-goal-fill{height:100%;border-radius:2px;transition:width .5s ease}
-.advice-history-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px}
-.advice-history-date{font-size:10px;color:var(--text3);margin-bottom:6px}
-.advice-history-text{font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
+.micro-val{font-size:14px;font-weight:500}
+.micro-bar{height:3px;background:var(--surface3);border-radius:2px;margin-top:5px;overflow:hidden}
+.micro-fill{height:100%;border-radius:2px;transition:width .5s}
 
-/* AI Chat */
-.ai-chat-wrap{display:flex;flex-direction:column;gap:10px}
-.ai-chat-msg{padding:12px 14px;border-radius:var(--radius-sm);font-size:13px;line-height:1.6;animation:fadeIn .2s ease}
-.ai-chat-msg.user{background:var(--accent-dim);border:1px solid rgba(255,107,26,.2);color:var(--text);align-self:flex-end;max-width:85%}
-.ai-chat-msg.ai{background:var(--surface2);border:1px solid var(--border);color:var(--text2);align-self:flex-start;max-width:85%}
-.ai-chat-msg.ai strong{color:var(--accent)}
+/* ── Overlays ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.overlay-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:520px;max-height:85vh;display:flex;flex-direction:column;padding:20px;animation:fadeIn .2s ease}
+.overlay-title{font-family:'DM Serif Display',serif;font-size:18px;margin-bottom:14px}
+.overlay-close{font-size:16px;color:var(--text3);cursor:pointer;line-height:1}
+.estimate-btns{display:flex;gap:8px}
+.ebtn{flex:1;padding:10px 6px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;text-align:center;cursor:pointer;border:1px solid var(--border);transition:all .15s;background:none}
+.ebtn.under{color:var(--carbs);border-color:rgba(240,180,41,.3)}
+.ebtn.under:hover{background:rgba(240,180,41,.1)}
+.ebtn.avg{color:var(--accent);border-color:rgba(255,107,26,.3)}
+.ebtn.avg:hover{background:rgba(255,107,26,.1)}
+.ebtn.over{color:var(--danger);border-color:rgba(224,48,48,.3)}
+.ebtn.over:hover{background:rgba(224,48,48,.1)}
+.confirm-btns{display:flex;gap:10px;justify-content:center;margin-top:4px}
+.cbtn-yes{padding:8px 20px;border-radius:var(--radius-sm);background:var(--danger);color:white;font-size:13px;font-weight:500}
+.cbtn-no{padding:8px 20px;border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:13px;border:1px solid var(--border)}
+.lib-search{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-size:13px;outline:none;margin-bottom:12px;-webkit-appearance:none}
+.lib-search:focus{border-color:var(--accent)}
+.lib-list{overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px}
+.lib-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lib-btns{display:flex;gap:6px;flex-shrink:0}
+.lib-log{padding:6px 12px;background:var(--accent);color:#0a0a08;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer}
+.lib-del{padding:6px 8px;background:rgba(224,48,48,.1);color:var(--danger);border:1px solid rgba(224,48,48,.2);border-radius:var(--radius-sm);font-size:12px;cursor:pointer}
 
-/* Settings */
-.settings-section{margin-bottom:20px}
-.settings-label{font-size:12px;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:500}
+/* ── Settings toggles ── */
 .toggle-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px}
-.toggle-label{font-size:13px;color:var(--text)}
+.toggle-lbl{font-size:13px}
 .toggle-desc{font-size:11px;color:var(--text3);margin-top:2px}
 .toggle{width:36px;height:20px;border-radius:10px;background:var(--border2);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
 .toggle.on{background:var(--accent)}
 .toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:white;top:3px;left:3px;transition:left .2s}
 .toggle.on::after{left:19px}
+.radio-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer}
+.radio-dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;transition:all .15s;position:relative}
+.radio-dot.on{border-color:var(--accent);background:var(--accent)}
 
-/* ── Mobile / iOS ─────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .header{padding:0 12px;height:48px;flex-wrap:wrap;position:sticky;top:0;z-index:100}
-  .logo{font-size:18px}
-  .nav{display:none}
-  .header-right{gap:6px}
-  .hbtn{padding:4px 8px;font-size:11px}
+/* ── Chat ── */
+.chat-msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.chat-msg{padding:11px 14px;border-radius:var(--radius-sm);font-size:13px;line-height:1.6;animation:fadeIn .2s ease;max-width:88%}
+.chat-msg.user{background:var(--accent-dim);border:1px solid rgba(255,107,26,.2);align-self:flex-end}
+.chat-msg.ai{background:var(--surface2);border:1px solid var(--border);color:var(--text2);align-self:flex-start}
+.chat-suggestion{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;font-size:12px;color:var(--text2);cursor:pointer;text-align:left;transition:all .15s;width:100%}
+.chat-suggestion:hover{border-color:var(--border2);color:var(--text)}
 
-  .main{flex-direction:column}
-  .sidebar{width:100%;height:auto;border-right:none;border-bottom:1px solid var(--border);max-height:55vh}
-  .content{padding:12px;min-height:0}
+/* ── History ── */
+.hist-entry{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-top:1px solid var(--border);gap:8px}
+.hist-name{font-size:13px;color:var(--text);font-weight:500;cursor:pointer}
+.hist-name:hover{color:var(--accent)}
+.hist-desc{font-size:10px;color:var(--text3);font-style:italic;margin-top:1px}
+.hist-pill{cursor:pointer;transition:opacity .15s}
+.hist-pill:hover{opacity:.7}
+.inline-input{background:var(--surface3);border:1px solid var(--accent);border-radius:4px;padding:2px 6px;color:var(--text);font-size:12px;outline:none;-webkit-appearance:none}
 
+/* ── Advice history ── */
+.advice-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px}
+.advice-date{font-size:10px;color:var(--text3);margin-bottom:6px}
+.advice-text{font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .header{height:48px}
+  .nav-desktop{display:none}
+  .main{flex-direction:column;height:auto;overflow:visible}
+  .sidebar{width:100%;border-right:none;border-bottom:1px solid var(--border);max-height:52vh}
+  .content{padding:12px;padding-bottom:80px}
+  .mobile-nav{display:flex}
   .grid-2{grid-template-columns:1fr}
-  .micro-grid{grid-template-columns:1fr 1fr}
-
-  /* Bottom nav for mobile */
-  .mobile-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);z-index:100;padding-bottom:env(safe-area-inset-bottom)}
-  .mobile-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;font-size:9px;color:var(--text3);gap:3px;cursor:pointer;transition:color .15s;border:none;background:none;font-family:'DM Sans',sans-serif}
-  .mobile-nav-btn.active{color:var(--accent)}
-  .mobile-nav-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-  .content{padding-bottom:70px}
-
-  .section-title{font-size:18px;margin-bottom:14px}
-  .stat-big{font-size:26px}
-  .card{padding:14px}
-  .week-bar-wrap{height:70px}
-
-  .estimate-box{margin:16px;width:auto}
-  .confirm-box{margin:16px;width:auto}
-
-  .ai-chat-wrap{padding-bottom:8px}
+  .overlay-box{max-height:90vh}
+  .app{padding-bottom:0}
 }
-@media (min-width: 769px) {
-  .mobile-nav{display:none}
-}
-/* Safe area for iPhone notch */
-@supports(padding-top: env(safe-area-inset-top)) {
-  .header{padding-top:env(safe-area-inset-top)}
-  body{padding-top:0}
+@media(min-width:769px){
+  .mobile-nav{display:none!important}
+  .content{padding-bottom:20px}
 }
 </style>
 </head>
@@ -247,220 +247,195 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 const SUPABASE_URL  = 'https://zadiqpsrtkuxjsvyyncb.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZGlxcHNydGt1eGpzdnl5bmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NDczMDksImV4cCI6MjA5NTIyMzMwOX0.1sAhTCse0BNigpp0CdmCeCNQ-N5WaOqxkLsdpSjf8Ww';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-const { useState, useEffect, useRef } = React;
+const {useState,useEffect,useRef} = React;
 
-function getToday() { return new Date().toISOString().split('T')[0]; }
-function getLast7Days() {
+function today() { return new Date().toISOString().split('T')[0]; }
+function last7() {
   return Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d.toISOString().split('T')[0];});
 }
 
-const DEFAULT_GOALS = {calories:2000,protein:150,carbs:200,fat:65,weight:75,target_weight:70,body_fat:20,target_body_fat:15};
-const DEFAULT_SETTINGS = {advancedMode:false,estimateMode:'ask',showMealBars:true};
+const DEF_GOALS = {calories:2000,protein:150,carbs:200,fat:65,weight:75,target_weight:70,body_fat:20,target_body_fat:15};
 const MICRO_GOALS = {vitaminC:{label:'Vitamin C',unit:'mg',goal:90},vitaminD:{label:'Vitamin D',unit:'mcg',goal:15},calcium:{label:'Calcium',unit:'mg',goal:1000},iron:{label:'Iron',unit:'mg',goal:18},sodium:{label:'Sodium',unit:'mg',goal:2300},potassium:{label:'Potassium',unit:'mg',goal:4700},magnesium:{label:'Magnesium',unit:'mg',goal:420},zinc:{label:'Zinc',unit:'mg',goal:11}};
 const MICRO_COLORS = {vitaminC:'#f0b429',vitaminD:'#ff6b1a',calcium:'#e08c3a',iron:'#c97a30',sodium:'#e03030',potassium:'#ff9950',magnesium:'#e07040',zinc:'#ffb347'};
 
-// ── Auth ───────────────────────────────────────────────────────
+// ─── Auth ─────────────────────────────────────────────────────
 function AuthScreen({onAuth}) {
   const [tab,setTab]=useState('login');
   const [email,setEmail]=useState('');
   const [pass,setPass]=useState('');
   const [name,setName]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [error,setError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState('');
   const [msg,setMsg]=useState('');
 
   async function submit() {
-    setError('');setMsg('');setLoading(true);
+    setErr('');setMsg('');setBusy(true);
     if(tab==='login'){
-      const {data,error:e}=await sb.auth.signInWithPassword({email,password:pass});
-      if(e)setError(e.message);else onAuth(data.user);
+      const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error)setErr(error.message); else onAuth(data.user);
     } else {
-      const {data,error:e}=await sb.auth.signUp({email,password:pass,options:{data:{display_name:name}}});
-      if(e)setError(e.message);
-      else if(data.user&&!data.session)setMsg('Check your email to confirm, then sign in.');
+      const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{display_name:name}}});
+      if(error)setErr(error.message);
+      else if(data.user&&!data.session)setMsg('Check your email to confirm your account.');
       else if(data.user)onAuth(data.user);
     }
-    setLoading(false);
+    setBusy(false);
   }
-  const onKey=e=>{if(e.key==='Enter')submit();};
 
-  return React.createElement('div',{className:'auth-screen'},
-    React.createElement('div',{className:'auth-card'},
-      React.createElement('div',{className:'auth-logo'},'GRAMS'),
-      React.createElement('div',{className:'auth-tagline'},'AI-powered macro & nutrition tracking'),
-      React.createElement('div',{className:'auth-tabs'},
-        ['login','signup'].map(t=>React.createElement('div',{key:t,className:'auth-tab'+(tab===t?' active':''),onClick:()=>{setTab(t);setError('');setMsg('')}},t==='login'?'Sign in':'Create account'))
+  const e=React.createElement;
+  return e('div',{className:'auth-screen'},
+    e('div',{className:'auth-card'},
+      e('div',{className:'auth-logo'},'GRAMS'),
+      e('div',{className:'auth-tagline'},'AI-powered macro & nutrition tracking'),
+      e('div',{className:'auth-tabs'},
+        ['login','signup'].map(t=>e('div',{key:t,className:'auth-tab'+(tab===t?' active':''),onClick:()=>{setTab(t);setErr('');setMsg('')}},t==='login'?'Sign in':'Create account'))
       ),
-      tab==='signup'&&React.createElement('div',{className:'auth-field'},React.createElement('label',null,'Name'),React.createElement('input',{type:'text',placeholder:'Your name',value:name,onChange:e=>setName(e.target.value),onKeyDown:onKey})),
-      React.createElement('div',{className:'auth-field'},React.createElement('label',null,'Email'),React.createElement('input',{type:'email',placeholder:'you@example.com',value:email,onChange:e=>setEmail(e.target.value),onKeyDown:onKey})),
-      React.createElement('div',{className:'auth-field'},React.createElement('label',null,'Password'),React.createElement('input',{type:'password',placeholder:'••••••••',value:pass,onChange:e=>setPass(e.target.value),onKeyDown:onKey})),
-      React.createElement('button',{className:'auth-btn',onClick:submit,disabled:loading},loading?'Please wait…':tab==='login'?'Sign in':'Create account'),
-      msg&&React.createElement('div',{style:{fontSize:'12px',color:'var(--accent)',textAlign:'center',marginTop:'12px'}},msg),
-      error&&React.createElement('div',{className:'auth-error'},error)
+      tab==='signup'&&e('div',{className:'auth-field'},e('label',null,'Name'),e('input',{type:'text',placeholder:'Your name',value:name,onChange:x=>setName(x.target.value),onKeyDown:x=>{if(x.key==='Enter')submit()}})),
+      e('div',{className:'auth-field'},e('label',null,'Email'),e('input',{type:'email',placeholder:'you@example.com',value:email,onChange:x=>setEmail(x.target.value),onKeyDown:x=>{if(x.key==='Enter')submit()}})),
+      e('div',{className:'auth-field'},e('label',null,'Password'),e('input',{type:'password',placeholder:'••••••••',value:pass,onChange:x=>setPass(x.target.value),onKeyDown:x=>{if(x.key==='Enter')submit()}})),
+      e('button',{className:'auth-btn',onClick:submit,disabled:busy},busy?'Please wait…':tab==='login'?'Sign in':'Create account'),
+      msg&&e('div',{className:'auth-msg',style:{color:'var(--accent)'}},msg),
+      err&&e('div',{className:'auth-msg',style:{color:'var(--danger)'}},err)
     )
   );
 }
 
-// ── Meal Bar Visual ────────────────────────────────────────────
-function MealBar({entry,expanded,onToggle}) {
-  const total=(entry.protein||0)+(entry.carbs||0)+(entry.fat||0)||1;
-  const segs=[
-    {color:'#ff6b1a',pct:((entry.protein||0)/total)*100,label:'P',val:entry.protein||0},
-    {color:'#f0b429',pct:((entry.carbs||0)/total)*100,label:'C',val:entry.carbs||0},
-    {color:'#e08c3a',pct:((entry.fat||0)/total)*100,label:'F',val:entry.fat||0},
-  ];
-  return React.createElement('div',{className:'meal-bar-wrap',onClick:onToggle},
-    React.createElement('div',{className:'meal-bar'},
-      segs.map((s,i)=>React.createElement('div',{key:i,className:'meal-bar-seg',style:{width:s.pct+'%',background:s.color}}))
+// ─── Mini components ──────────────────────────────────────────
+function Bubble() {
+  const e=React.createElement;
+  return e('div',{className:'bubble'},e('span'),e('span'),e('span'));
+}
+
+function MacroBar({label,current,goal,color}) {
+  const e=React.createElement;
+  const pct=goal>0?Math.min(100,(current/goal)*100):0;
+  const over=current>goal&&goal>0;
+  return e('div',{className:'macro-row'},
+    e('div',{className:'macro-lrow'},
+      e('span',{className:'macro-name',style:{color}},label),
+      e('span',{className:'macro-vals'},Math.round(current)+'g'+(goal>0?' / '+goal+'g':''))
     ),
-    expanded&&React.createElement('div',{className:'meal-bar-detail'},
-      segs.map((s,i)=>React.createElement('div',{key:i,className:'meal-bar-label'},
-        React.createElement('div',{className:'meal-bar-dot',style:{background:s.color}}),
-        React.createElement('span',{style:{fontSize:'10px',color:'var(--text2)'}},s.label+' '+s.val+'g ('+Math.round(s.pct)+'%)')
-      ))
-    )
+    goal>0&&e('div',{className:'pbar'},e('div',{className:'pfill',style:{width:pct+'%',background:over?'#e03030':color}}))
   );
 }
 
-// ── Pie Chart ──────────────────────────────────────────────────
-function PieChart({protein,carbs,fat}) {
-  const ref=useRef(null),chart=useRef(null);
-  const toDisplay = (kg) => weightUnit==='lbs' ? Math.round(kg*2.20462*10)/10 : kg;
-  const toKg = (val) => weightUnit==='lbs' ? Math.round(val/2.20462*10)/10 : parseFloat(val);
-  const unitLabel = weightUnit==='lbs' ? 'lbs' : 'kg';
+function WeekChart({entries}) {
+  const e=React.createElement;
+  const days=last7(),tod=today();
+  const vals=days.map(d=>(entries[d]||[]).reduce((s,x)=>s+(x.calories||0),0));
+  const max=Math.max(...vals,1);
+  return e('div',{className:'week-bars'},
+    days.map((d,i)=>{
+      const h=Math.round((vals[i]/max)*68);
+      return e('div',{key:d,className:'wbar-col'},
+        e('div',{style:{fontSize:'9px',color:vals[i]>0?'var(--text2)':'transparent',marginBottom:'2px'}},vals[i]>0?Math.round(vals[i]):''),
+        e('div',{className:'wbar',style:{height:h+'px',background:d===tod?'#ff6b1a':'rgba(255,107,26,.28)'}}),
+        e('span',{className:'wbar-label'},['M','T','W','T','F','S','S'][i])
+      );
+    })
+  );
+}
 
+function PieChart({protein,carbs,fat}) {
+  const e=React.createElement;
+  const ref=useRef(null),chart=useRef(null);
   useEffect(()=>{
     if(!ref.current)return;
     if(chart.current)chart.current.destroy();
     const total=protein+carbs+fat;
-    if(total===0)return;
-    chart.current=new Chart(ref.current,{type:'doughnut',data:{labels:['Protein','Carbs','Fat'],datasets:[{data:[protein,carbs,fat],backgroundColor:['#ff6b1a','#f0b429','#e08c3a'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.raw}g (${Math.round((ctx.raw/total)*100)}%)`}}}}});
+    if(!total)return;
+    chart.current=new Chart(ref.current,{
+      type:'doughnut',
+      data:{labels:['Protein','Carbs','Fat'],datasets:[{data:[protein,carbs,fat],backgroundColor:['#ff6b1a','#f0b429','#e08c3a'],borderWidth:0,hoverOffset:4}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.raw}g (${Math.round((ctx.raw/total)*100)}%)`}}}}
+    });
     return()=>{if(chart.current)chart.current.destroy();};
   },[protein,carbs,fat]);
   const total=protein+carbs+fat;
-  const pcts=[protein,carbs,fat].map(v=>total>0?Math.round((v/total)*100):0);
-  return React.createElement('div',{style:{display:'flex',alignItems:'center',gap:'18px'}},
-    React.createElement('div',{style:{position:'relative',width:'120px',height:'120px',flexShrink:0}},React.createElement('canvas',{ref})),
-    React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:'9px'}},
+  const pcts=[protein,carbs,fat].map(v=>total?Math.round((v/total)*100):0);
+  return e('div',{style:{display:'flex',alignItems:'center',gap:'16px'}},
+    e('div',{style:{width:'110px',height:'110px',flexShrink:0}},e('canvas',{ref})),
+    e('div',{style:{display:'flex',flexDirection:'column',gap:'8px'}},
       [['Protein',pcts[0],'#ff6b1a'],['Carbs',pcts[1],'#f0b429'],['Fat',pcts[2],'#e08c3a']].map(([n,p,c])=>
-        React.createElement('div',{key:n,style:{display:'flex',alignItems:'center',gap:'8px'}},
-          React.createElement('div',{style:{width:'9px',height:'9px',borderRadius:'2px',background:c}}),
-          React.createElement('span',{style:{fontSize:'12px',color:'var(--text2)',minWidth:'48px'}},n),
-          React.createElement('span',{style:{fontSize:'13px',fontWeight:500,color:c}},p+'%')
+        e('div',{key:n,style:{display:'flex',alignItems:'center',gap:'7px'}},
+          e('div',{style:{width:'9px',height:'9px',borderRadius:'2px',background:c}}),
+          e('span',{style:{fontSize:'12px',color:'var(--text2)',minWidth:'46px'}},n),
+          e('span',{style:{fontSize:'13px',fontWeight:500,color:c}},p+'%')
         )
       )
     )
   );
 }
 
-// ── Week Chart ─────────────────────────────────────────────────
-function WeekChart({entries}) {
-  const days=getLast7Days(),today=getToday();
-  const vals=days.map(d=>(entries[d]||[]).reduce((s,e)=>s+(e.calories||0),0));
-  const max=Math.max(...vals,1);
-  return React.createElement('div',{className:'week-bar-wrap'},
-    days.map((d,i)=>{
-      const h=Math.round((vals[i]/max)*72);
-      return React.createElement('div',{key:d,className:'week-bar-col'},
-        React.createElement('div',{style:{fontSize:'9px',color:vals[i]>0?'var(--text2)':'transparent',marginBottom:'2px'}},vals[i]>0?Math.round(vals[i]):''),
-        React.createElement('div',{className:'week-bar',style:{height:h+'px',background:d===today?'#ff6b1a':'rgba(255,107,26,.28)'}}),
-        React.createElement('span',{className:'day-label'},['M','T','W','T','F','S','S'][i])
-      );
-    })
-  );
-}
-
-// ── MacroBar ───────────────────────────────────────────────────
-function MacroBar({label,current,goal,color}) {
-  const pct=goal>0?Math.min(100,(current/goal)*100):0;
-  const over=current>goal&&goal>0;
-  return React.createElement('div',{className:'macro-row'},
-    React.createElement('div',{className:'macro-label-row'},
-      React.createElement('span',{className:'macro-name',style:{color}},label),
-      React.createElement('span',{className:'macro-vals'},`${Math.round(current)}g${goal>0?` / ${goal}g`:''}`)
-    ),
-    goal>0&&React.createElement('div',{className:'progress-bar'},React.createElement('div',{className:'progress-fill',style:{width:pct+'%',background:over?'#e03030':color}}))
-  );
-}
-
-// ── Estimate Dialog ────────────────────────────────────────────
-function EstimateDialog({food,onChoose}) {
-  const u=food.under,a=food.avg,o=food.over;
-  return React.createElement('div',{className:'estimate-overlay'},
-    React.createElement('div',{className:'estimate-box'},
-      React.createElement('div',{className:'estimate-title'},'Which estimate?'),
-      React.createElement('div',{className:'estimate-food'},food.name),
-      React.createElement('div',{className:'estimate-macros'},
-        `Under: ${u.calories} kcal | ${u.protein}p ${u.carbs}c ${u.fat}f\n`+
-        `Average: ${a.calories} kcal | ${a.protein}p ${a.carbs}c ${a.fat}f\n`+
-        `Over: ${o.calories} kcal | ${o.protein}p ${o.carbs}c ${o.fat}f`
-      ),
-      React.createElement('div',{className:'estimate-btns'},
-        React.createElement('button',{className:'ebtn under',onClick:()=>onChoose('under')},'⬇ Under'),
-        React.createElement('button',{className:'ebtn avg',onClick:()=>onChoose('avg')},'≈ Average'),
-        React.createElement('button',{className:'ebtn over',onClick:()=>onChoose('over')},'⬆ Over')
-      )
+function MealBarViz({entry,expanded,onToggle}) {
+  const e=React.createElement;
+  const total=(entry.protein||0)+(entry.carbs||0)+(entry.fat||0)||1;
+  const segs=[
+    {c:'#ff6b1a',pct:((entry.protein||0)/total)*100,label:'P',val:entry.protein||0},
+    {c:'#f0b429',pct:((entry.carbs||0)/total)*100,label:'C',val:entry.carbs||0},
+    {c:'#e08c3a',pct:((entry.fat||0)/total)*100,label:'F',val:entry.fat||0},
+  ];
+  return e('div',{onClick:onToggle},
+    e('div',{className:'meal-bar'},segs.map((s,i)=>e('div',{key:i,className:'meal-bar-seg',style:{width:s.pct+'%',background:s.c}}))),
+    expanded&&e('div',{className:'meal-bar-detail'},
+      segs.map((s,i)=>e('div',{key:i,className:'meal-bar-lbl'},
+        e('div',{className:'meal-bar-dot',style:{background:s.c}}),
+        s.label+' '+s.val+'g ('+Math.round(s.pct)+'%)'
+      ))
     )
   );
 }
 
-// ── Confirm Dialog ─────────────────────────────────────────────
-function ConfirmDialog({title,text,onYes,onNo}) {
-  return React.createElement('div',{className:'confirm-overlay',onClick:onNo},
-    React.createElement('div',{className:'confirm-box',onClick:e=>e.stopPropagation()},
-      React.createElement('div',{className:'confirm-title'},title),
-      React.createElement('div',{className:'confirm-text'},text),
-      React.createElement('div',{className:'confirm-btns'},
-        React.createElement('button',{className:'confirm-no',onClick:onNo},'Cancel'),
-        React.createElement('button',{className:'confirm-yes',onClick:onYes},'Clear all')
-      )
-    )
-  );
-}
-
-// ── Main App ───────────────────────────────────────────────────
+// ─── Main App ─────────────────────────────────────────────────
 function App({user,onLogout}) {
+  const e=React.createElement;
   const [view,setView]=useState('today');
-  const [settings,setSettings]=useState(DEFAULT_SETTINGS);
+  const [settings,setSettings]=useState({advancedMode:false,estimateMode:'ask',showMealBars:true});
   const [entries,setEntries]=useState({});
-  const [goals,setGoals]=useState(DEFAULT_GOALS);
-  const [adviceHistory,setAdviceHistory]=useState([]);
-  const [input,setInput]=useState('');
-  const [inputMode,setInputMode]=useState('ai'); // 'ai' | 'manual'
-  const [manual,setManual]=useState({name:'',calories:'',protein:'',carbs:'',fat:'',fiber:''});
-  const [loading,setLoading]=useState(false);
-  const [syncing,setSyncing]=useState(false);
-  const [aiAdvice,setAiAdvice]=useState('');
-  const [adviceLoading,setAdviceLoading]=useState(false);
-  const [goalInput,setGoalInput]=useState({});
-  const [showConfirm,setShowConfirm]=useState(false);
-  const [initDone,setInitDone]=useState(false);
-  const [pendingFood,setPendingFood]=useState(null); // for estimate dialog
-  const [expandedMeals,setExpandedMeals]=useState({});
-  const [aiChat,setAiChat]=useState([]); // [{role,text}]
-  const [aiChatInput,setAiChatInput]=useState('');
-  const [aiChatLoading,setAiChatLoading]=useState(false);
-  const [mealName,setMealName]=useState('');
-  const [editingEntry,setEditingEntry]=useState(null); // {id, date, value}
-  const [editingMacro,setEditingMacro]=useState(null); // {id, date, field, value}
+  const [goals,setGoals]=useState(DEF_GOALS);
   const [savedFoods,setSavedFoods]=useState([]);
-  const [showLibrary,setShowLibrary]=useState(false);
-  const [librarySearch,setLibrarySearch]=useState('');
+  const [adviceHistory,setAdviceHistory]=useState([]);
+
+  // Input state
+  const [inputMode,setInputMode]=useState('ai');
+  const [aiText,setAiText]=useState('');
+  const [mealName,setMealName]=useState('');
   const [showOverride,setShowOverride]=useState(false);
   const [override,setOverride]=useState({calories:'',protein:'',carbs:'',fat:'',fiber:''});
-  const [weightUnit,setWeightUnit]=useState('kg'); // 'kg' | 'lbs'
-  const logEndRef=useRef(null);
-  const chatEndRef=useRef(null);
+  const [manual,setManual]=useState({name:'',calories:'',protein:'',carbs:'',fat:'',fiber:''});
 
+  // UI state
+  const [loading,setLoading]=useState(false);
+  const [syncing,setSyncing]=useState(false);
+  const [initDone,setInitDone]=useState(false);
+  const [pendingFood,setPendingFood]=useState(null);
+  const [expandedMeals,setExpandedMeals]=useState({});
+  const [showLibrary,setShowLibrary]=useState(false);
+  const [libSearch,setLibSearch]=useState('');
+  const [showConfirm,setShowConfirm]=useState(false);
+  const [editingName,setEditingName]=useState(null);   // {id,date,value}
+  const [editingMacro,setEditingMacro]=useState(null); // {id,date,field,value}
+  const [goalInput,setGoalInput]=useState({});
+  const [weightUnit,setWeightUnit]=useState('kg');
+  const [aiAdvice,setAiAdvice]=useState('');
+  const [adviceLoading,setAdviceLoading]=useState(false);
+  const [chatMsgs,setChatMsgs]=useState([]);
+  const [chatInput,setChatInput]=useState('');
+  const [chatLoading,setChatLoading]=useState(false);
+
+  const logRef=useRef(null);
+  const chatRef=useRef(null);
+
+  // ── Load data ───────────────────────────────────────────────
   useEffect(()=>{
     async function init(){
       setSyncing(true);
       const {data:profile}=await sb.from('profiles').select('*').eq('id',user.id).single();
-      if(profile){
-        setSettings(prev=>({...prev,advancedMode:profile.advanced_mode||false}));
-      }
+      if(profile)setSettings(p=>({...p,advancedMode:profile.advanced_mode||false}));
+
       const {data:g}=await sb.from('goals').select('*').eq('user_id',user.id).single();
       if(g)setGoals({calories:g.calories,protein:g.protein,carbs:g.carbs,fat:g.fat,weight:g.weight,target_weight:g.target_weight,body_fat:g.body_fat,target_body_fat:g.target_body_fat});
+
       const since=new Date();since.setDate(since.getDate()-60);
       const {data:fe}=await sb.from('food_entries').select('*').eq('user_id',user.id).gte('eaten_date',since.toISOString().split('T')[0]).order('eaten_at',{ascending:true});
       if(fe){
@@ -468,189 +443,172 @@ function App({user,onLogout}) {
         fe.forEach(row=>{
           const d=row.eaten_date;
           if(!map[d])map[d]=[];
-          map[d].push({id:row.id,name:row.name,description:row.description||'',calories:row.calories,protein:row.protein,carbs:row.carbs,fat:row.fat,fiber:row.fiber,micros:row.micros||{},updatedAt:row.updated_at||null,time:new Date(row.eaten_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
+          map[d].push({id:row.id,name:row.name,description:row.description||'',calories:row.calories,protein:row.protein,carbs:row.carbs,fat:row.fat,fiber:row.fiber,micros:row.micros||{},time:new Date(row.eaten_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});
         });
         setEntries(map);
       }
+
       const {data:sf}=await sb.from('saved_foods').select('*').eq('user_id',user.id).order('use_count',{ascending:false});
       if(sf)setSavedFoods(sf);
+
       const {data:ah}=await sb.from('ai_advice').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(10);
       if(ah)setAdviceHistory(ah);
+
       setSyncing(false);setInitDone(true);
     }
     init();
   },[user.id]);
 
-  useEffect(()=>{logEndRef.current?.scrollIntoView({behavior:'smooth'});},[entries,loading]);
-  useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:'smooth'});},[aiChat,aiChatLoading]);
+  useEffect(()=>{logRef.current?.scrollIntoView({behavior:'smooth'});},[entries,loading]);
+  useEffect(()=>{chatRef.current?.scrollIntoView({behavior:'smooth'});},[chatMsgs,chatLoading]);
+
+  // ── Helpers ──────────────────────────────────────────────────
+  const toDisplay=kg=>weightUnit==='lbs'?Math.round(kg*2.20462*10)/10:kg;
+  const toKg=v=>weightUnit==='lbs'?Math.round(v/2.20462*10)/10:parseFloat(v);
+  const unitLbl=weightUnit==='lbs'?'lbs':'kg';
 
   async function callClaude(messages,system){
     const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:1000,system,messages})});
-    if(!res.ok){const t=await res.text();throw new Error('API '+res.status+': '+t.slice(0,100));}
+    if(!res.ok){const t=await res.text();throw new Error('API '+res.status+': '+t.slice(0,120));}
     const data=await res.json();
     if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
     return data.content.map(b=>b.type==='text'?b.text:'').filter(Boolean).join('\n').trim();
   }
 
   async function saveEntry(entry){
-    const today=getToday();
-    const row={user_id:user.id,name:entry.name,description:entry.description||'',calories:Math.round(entry.calories||0),protein:Math.round(entry.protein||0),carbs:Math.round(entry.carbs||0),fat:Math.round(entry.fat||0),fiber:Math.round(entry.fiber||0),micros:entry.micros||{},eaten_date:today,eaten_at:new Date().toISOString()};
-    const {data:inserted,error:dbErr}=await sb.from('food_entries').insert(row).select().single();
-    if(dbErr)throw new Error('DB: '+dbErr.message);
-    if(inserted){
-      const display={...inserted,time:new Date(inserted.eaten_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})};
-      setEntries(prev=>({...prev,[today]:[...(prev[today]||[]),display]}));
+    const tod=today();
+    const row={user_id:user.id,name:entry.name,description:entry.description||'',calories:Math.round(entry.calories||0),protein:Math.round(entry.protein||0),carbs:Math.round(entry.carbs||0),fat:Math.round(entry.fat||0),fiber:Math.round(entry.fiber||0),micros:entry.micros||{},eaten_date:tod,eaten_at:new Date().toISOString()};
+    const {data:ins,error}=await sb.from('food_entries').insert(row).select().single();
+    if(error)throw new Error('DB: '+error.message);
+    if(ins){
+      const display={...ins,time:new Date(ins.eaten_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})};
+      setEntries(p=>({...p,[tod]:[...(p[tod]||[]),display]}));
     }
   }
 
+  // ── AI send ──────────────────────────────────────────────────
   async function handleSend(){
-    const msg=input.trim();
+    const msg=aiText.trim();
     if(!msg||loading)return;
-    setInput('');
-
-    if(['clear','reset','delete all','wipe','remove all','start over'].some(p=>msg.toLowerCase().includes(p))){
-      setShowConfirm(true);return;
-    }
-
+    setAiText('');
+    if(['clear','reset','delete all','wipe','start over'].some(p=>msg.toLowerCase().includes(p))){setShowConfirm(true);return;}
     setLoading(true);
-    const system=`You are a precise nutrition AI. Analyse the food description and return ONLY valid JSON, no markdown, no text before or after.
+    const sys=`You are a precise nutrition AI. Return ONLY valid JSON, no markdown, no text outside the JSON.
 
-Return this exact structure:
 {
   "name": "descriptive food name",
-  "avg": {"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number},
-  "under": {"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number},
-  "over": {"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number}${settings.advancedMode?`,
-  "micros": {"vitaminC": number, "vitaminD": number, "calcium": number, "iron": number, "sodium": number, "potassium": number, "magnesium": number, "zinc": number}`:''}
+  "avg":   {"calories":number,"protein":number,"carbs":number,"fat":number,"fiber":number},
+  "under": {"calories":number,"protein":number,"carbs":number,"fat":number,"fiber":number},
+  "over":  {"calories":number,"protein":number,"carbs":number,"fat":number,"fiber":number}${settings.advancedMode?`,
+  "micros":{"vitaminC":number,"vitaminD":number,"calcium":number,"iron":number,"sodium":number,"potassium":number,"magnesium":number,"zinc":number}`:''}
 }
 
-under = conservative/lighter estimate, avg = standard/average, over = generous/heavier estimate.
-For branded/restaurant items estimate as accurately as possible.
-All values must be numbers. Never return null.`;
-
-    try {
-      const raw=await callClaude([{role:'user',content:msg}],system);
-      const clean=raw.replace(/```json|```/g,'').trim();
-      const s=clean.indexOf('{'),e=clean.lastIndexOf('}');
-      if(s===-1||e===-1)throw new Error('No JSON in response: '+raw.slice(0,200));
-      const food=JSON.parse(clean.slice(s,e+1));
+under=conservative, avg=standard, over=generous. All numbers, never null.`;
+    try{
+      const raw=await callClaude([{role:'user',content:msg}],sys);
+      const s=raw.indexOf('{'),en=raw.lastIndexOf('}');
+      if(s===-1)throw new Error('No JSON returned: '+raw.slice(0,150));
+      const food=JSON.parse(raw.slice(s,en+1));
       food.micros=food.micros||{};
 
-      // Apply manual overrides if any filled in
-      const applyOverride=(vals)=>{
+      // Apply overrides
+      const applyOv=vals=>{
         const out={...vals};
-        Object.keys(override).forEach(k=>{if(override[k]!=='')out[k]=parseFloat(override[k]);});
+        Object.keys(override).forEach(k=>{if(override[k]!=='')out[k]=parseFloat(override[k])||0;});
         return out;
       };
+      food.avg=applyOv(food.avg);food.under=applyOv(food.under);food.over=applyOv(food.over);
+
       if(settings.estimateMode==='ask'){
-        // Bake overrides into all three estimates
-        food.under=applyOverride(food.under);
-        food.avg=applyOverride(food.avg);
-        food.over=applyOverride(food.over);
         setPendingFood(food);
       } else {
         const choice=settings.estimateMode==='under'?food.under:settings.estimateMode==='over'?food.over:food.avg;
-        const finalVals=applyOverride(choice);
         const finalName=mealName.trim()||food.name;
         const desc=mealName.trim()?food.name:'';
-        await saveEntry({name:finalName,description:desc,...finalVals,micros:food.micros});
-        setMealName('');
-        setOverride({calories:'',protein:'',carbs:'',fat:'',fiber:''});
+        await saveEntry({name:finalName,description:desc,...choice,micros:food.micros});
+        setMealName('');setOverride({calories:'',protein:'',carbs:'',fat:'',fiber:''});
       }
     } catch(err){
-      console.error('handleSend error:',err);
-      const today=getToday();
-      setEntries(prev=>({...prev,[today]:[...(prev[today]||[]),{id:Date.now(),isError:true,name:'\u26a0 '+err.message,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]}));
+      const tod=today();
+      setEntries(p=>({...p,[tod]:[...(p[tod]||[]),{id:Date.now(),isError:true,name:'⚠ '+err.message,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}]}));
     }
     setLoading(false);
   }
 
-  async function handleEstimateChoice(choice){
+  async function handleEstimate(choice){
     if(!pendingFood)return;
     const vals=pendingFood[choice];
     const finalName=mealName.trim()||pendingFood.name;
     const desc=mealName.trim()?pendingFood.name:'';
-    await saveEntry({name:finalName,description:desc,...vals,micros:pendingFood.micros||{}}).catch(err=>{
-      console.error(err);
-    });
-    setPendingFood(null);
-    setMealName('');
+    try{await saveEntry({name:finalName,description:desc,...vals,micros:pendingFood.micros||{}});}catch(err){console.error(err);}
+    setPendingFood(null);setMealName('');setOverride({calories:'',protein:'',carbs:'',fat:'',fiber:''});
   }
 
   function handleManualAdd(){
-    const cal=parseFloat(manual.calories)||0;
-    const p=parseFloat(manual.protein)||0;
-    const c=parseFloat(manual.carbs)||0;
-    const f=parseFloat(manual.fat)||0;
-    const fi=parseFloat(manual.fiber)||0;
-    if(!manual.name.trim()&&cal===0)return;
-    const name=manual.name.trim()||`${cal} kcal meal`;
-    saveEntry({name,calories:cal,protein:p,carbs:c,fat:f,fiber:fi,micros:{}});
+    const n=manual.name.trim()||((parseFloat(manual.calories)||0)+' kcal meal');
+    saveEntry({name:n,description:'',calories:parseFloat(manual.calories)||0,protein:parseFloat(manual.protein)||0,carbs:parseFloat(manual.carbs)||0,fat:parseFloat(manual.fat)||0,fiber:parseFloat(manual.fiber)||0,micros:{}});
     setManual({name:'',calories:'',protein:'',carbs:'',fat:'',fiber:''});
   }
 
-  async function deleteEntry(date,id){
-    await sb.from('food_entries').delete().eq('id',id).eq('user_id',user.id);
-    setEntries(prev=>({...prev,[date]:(prev[date]||[]).filter(e=>e.id!==id)}));
-  }
-
+  // ── Library ──────────────────────────────────────────────────
   async function saveToLibrary(entry){
-    // Check if already saved (by name match)
     const existing=savedFoods.find(f=>f.name.toLowerCase()===entry.name.toLowerCase());
     if(existing){
-      // Increment use_count
       await sb.from('saved_foods').update({use_count:existing.use_count+1,updated_at:new Date().toISOString()}).eq('id',existing.id);
-      setSavedFoods(prev=>prev.map(f=>f.id===existing.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
+      setSavedFoods(p=>p.map(f=>f.id===existing.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
       return;
     }
     const row={user_id:user.id,name:entry.name,description:entry.description||'',calories:Math.round(entry.calories||0),protein:Math.round(entry.protein||0),carbs:Math.round(entry.carbs||0),fat:Math.round(entry.fat||0),fiber:Math.round(entry.fiber||0),micros:entry.micros||{}};
     const {data:saved}=await sb.from('saved_foods').insert(row).select().single();
-    if(saved)setSavedFoods(prev=>[saved,...prev]);
+    if(saved)setSavedFoods(p=>[saved,...p]);
   }
 
   async function logFromLibrary(food){
     await saveEntry({name:food.name,description:food.description||'',calories:food.calories,protein:food.protein,carbs:food.carbs,fat:food.fat,fiber:food.fiber,micros:food.micros||{}});
-    // Increment use count
     await sb.from('saved_foods').update({use_count:food.use_count+1,updated_at:new Date().toISOString()}).eq('id',food.id);
-    setSavedFoods(prev=>prev.map(f=>f.id===food.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
-    setShowLibrary(false);
-    setView('today');
+    setSavedFoods(p=>p.map(f=>f.id===food.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
+    setShowLibrary(false);setView('today');
   }
 
   async function deleteFromLibrary(id){
     await sb.from('saved_foods').delete().eq('id',id).eq('user_id',user.id);
-    setSavedFoods(prev=>prev.filter(f=>f.id!==id));
+    setSavedFoods(p=>p.filter(f=>f.id!==id));
   }
 
-  async function updateEntryMacro(date,id,field,value){
-    const num=Math.round(parseFloat(value)||0);
+  // ── Entry edits ──────────────────────────────────────────────
+  async function deleteEntry(date,id){
+    await sb.from('food_entries').delete().eq('id',id).eq('user_id',user.id);
+    setEntries(p=>({...p,[date]:(p[date]||[]).filter(x=>x.id!==id)}));
+  }
+
+  async function updateName(date,id,val){
+    if(!val.trim())return;
+    await sb.from('food_entries').update({name:val.trim(),updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
+    setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,name:val.trim()}:x)}));
+    setEditingName(null);
+  }
+
+  async function updateMacro(date,id,field,val){
+    const num=Math.round(parseFloat(val)||0);
     await sb.from('food_entries').update({[field]:num,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
-    setEntries(prev=>({...prev,[date]:(prev[date]||[]).map(e=>e.id===id?{...e,[field]:num}:e)}));
+    setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,[field]:num}:x)}));
     setEditingMacro(null);
-  }
-
-  async function updateEntryName(date,id,newName){
-    if(!newName.trim())return;
-    await sb.from('food_entries')
-      .update({name:newName.trim(), updated_at:new Date().toISOString()})
-      .eq('id',id).eq('user_id',user.id);
-    setEntries(prev=>({...prev,[date]:(prev[date]||[]).map(e=>e.id===id?{...e,name:newName.trim()}:e)}));
-    setEditingEntry(null);
   }
 
   async function clearAll(){
     await sb.from('food_entries').delete().eq('user_id',user.id);
     await sb.from('ai_advice').delete().eq('user_id',user.id);
-    setEntries({});setAdviceHistory([]);setAiAdvice('');setAiChat([]);setShowConfirm(false);
+    setEntries({});setAdviceHistory([]);setAiAdvice('');setChatMsgs([]);setShowConfirm(false);
   }
 
+  // ── Goals ────────────────────────────────────────────────────
   async function saveGoals(){
     const updated={...goals};
     Object.keys(goalInput).forEach(k=>{
       const v=parseFloat(goalInput[k]);
       if(!isNaN(v)){
-        const isWeight=k==='weight'||k==='target_weight';
-        updated[k]=isWeight?toKg(v):v;
+        const isW=k==='weight'||k==='target_weight';
+        updated[k]=isW?toKg(v):v;
       }
     });
     setGoals(updated);setGoalInput({});
@@ -658,71 +616,56 @@ All values must be numbers. Never return null.`;
   }
 
   async function updateSetting(key,val){
-    setSettings(prev=>({...prev,[key]:val}));
-    if(key==='advancedMode'){
-      await sb.from('profiles').update({advanced_mode:val}).eq('id',user.id);
-    }
+    setSettings(p=>({...p,[key]:val}));
+    if(key==='advancedMode')await sb.from('profiles').update({advanced_mode:val}).eq('id',user.id);
   }
 
-  async function getAIAdvice(){
+  // ── AI Advice ────────────────────────────────────────────────
+  async function getAdvice(){
     setAdviceLoading(true);
-    const days=getLast7Days();
+    const days=last7();
     const weekData=days.map(d=>{
-      const t=(entries[d]||[]).reduce((a,e)=>({cal:a.cal+(e.calories||0),p:a.p+(e.protein||0),c:a.c+(e.carbs||0),f:a.f+(e.fat||0)}),{cal:0,p:0,c:0,f:0});
+      const t=(entries[d]||[]).reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
       return `${d}: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F`;
     }).join('\n');
-    const system='You are a professional sports nutritionist. Give warm, specific, actionable advice in under 200 words. Include 3 concrete tips.';
-    const content=`My week:\n${weekData}\n\nGoals: ${goals.calories} kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nCurrent: ${goals.weight}kg → Target: ${goals.target_weight}kg, BF: ${goals.body_fat}% → ${goals.target_body_fat}%`;
-    try {
-      const advice=await callClaude([{role:'user',content}],system);
+    try{
+      const advice=await callClaude([{role:'user',content:`My week:\n${weekData}\n\nGoals: ${goals.calories} kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%\n\nGive warm, specific advice in under 200 words with 3 concrete tips.`}],'You are a professional sports nutritionist.');
       setAiAdvice(advice);
       const {data:saved}=await sb.from('ai_advice').insert({user_id:user.id,advice,week_start:days[0]}).select().single();
-      if(saved)setAdviceHistory(prev=>[saved,...prev].slice(0,10));
-    } catch(err){setAiAdvice('Error: '+err.message);}
+      if(saved)setAdviceHistory(p=>[saved,...p].slice(0,10));
+    }catch(err){setAiAdvice('Error: '+err.message);}
     setAdviceLoading(false);
   }
 
-  async function handleAiChat(){
-    const msg=aiChatInput.trim();
-    if(!msg||aiChatLoading)return;
-    setAiChatInput('');
-    setAiChat(prev=>[...prev,{role:'user',text:msg}]);
-    setAiChatLoading(true);
-
-    const today=getToday();
-    const todayTotals=(entries[today]||[]).reduce((a,e)=>({cal:a.cal+(e.calories||0),p:a.p+(e.protein||0),c:a.c+(e.carbs||0),f:a.f+(e.fat||0)}),{cal:0,p:0,c:0,f:0});
-    const weekTotals=getLast7Days().reduce((acc,d)=>{
-      (entries[d]||[]).forEach(e=>{acc.cal+=e.calories||0;acc.p+=e.protein||0;acc.c+=e.carbs||0;acc.f+=e.fat||0;});
-      return acc;
-    },{cal:0,p:0,c:0,f:0});
-
-    const system=`You are GRAMS, a friendly and direct nutrition AI assistant. Answer concisely in 2-4 sentences. Be honest — give clear yes/no answers when asked. Use the user's data to give specific, personalised responses.
-
-User's data:
-- Goals: ${goals.calories} kcal, ${goals.protein}g protein, ${goals.carbs}g carbs, ${goals.fat}g fat
-- Today so far: ${Math.round(todayTotals.cal)} kcal, ${Math.round(todayTotals.p)}g P, ${Math.round(todayTotals.c)}g C, ${Math.round(todayTotals.f)}g F
-- This week avg/day: ${Math.round(weekTotals.cal/7)} kcal, ${Math.round(weekTotals.p/7)}g P
-- Body: ${goals.weight}kg → ${goals.target_weight}kg target, ${goals.body_fat}% → ${goals.target_body_fat}% BF target`;
-
-    try {
-      const reply=await callClaude([{role:'user',content:msg}],system);
-      setAiChat(prev=>[...prev,{role:'ai',text:reply}]);
-    } catch(err){
-      setAiChat(prev=>[...prev,{role:'ai',text:'Error: '+err.message}]);
-    }
-    setAiChatLoading(false);
+  // ── AI Chat ──────────────────────────────────────────────────
+  async function handleChat(){
+    const msg=chatInput.trim();
+    if(!msg||chatLoading)return;
+    setChatInput('');
+    setChatMsgs(p=>[...p,{role:'user',text:msg}]);
+    setChatLoading(true);
+    const tod=today();
+    const todTotals=(entries[tod]||[]).reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
+    const wk=last7().reduce((acc,d)=>{(entries[d]||[]).forEach(x=>{acc.cal+=x.calories||0;acc.p+=x.protein||0;});return acc;},{cal:0,p:0});
+    const sys=`You are GRAMS, a direct nutrition AI. Answer in 2-4 sentences. Give clear yes/no answers. Use the user's actual data.\n\nToday: ${Math.round(todTotals.cal)} kcal, ${Math.round(todTotals.p)}g P, ${Math.round(todTotals.c)}g C, ${Math.round(todTotals.f)}g F\nGoals: ${goals.calories} kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nWeek avg/day: ${Math.round(wk.cal/7)} kcal, ${Math.round(wk.p/7)}g P\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%`;
+    try{
+      const reply=await callClaude([{role:'user',content:msg}],sys);
+      setChatMsgs(p=>[...p,{role:'ai',text:reply}]);
+    }catch(err){setChatMsgs(p=>[...p,{role:'ai',text:'Error: '+err.message}]);}
+    setChatLoading(false);
   }
 
-  const today=getToday();
-  const todayEntries=entries[today]||[];
-  const totals=todayEntries.reduce((acc,e)=>{
-    acc.calories+=e.calories||0;acc.protein+=e.protein||0;acc.carbs+=e.carbs||0;acc.fat+=e.fat||0;acc.fiber+=e.fiber||0;
-    Object.keys(e.micros||{}).forEach(k=>{acc.micros[k]=(acc.micros[k]||0)+(e.micros[k]||0);});
+  // ── Derived data ─────────────────────────────────────────────
+  const tod=today();
+  const todayEntries=entries[tod]||[];
+  const totals=todayEntries.reduce((acc,x)=>{
+    acc.calories+=x.calories||0;acc.protein+=x.protein||0;acc.carbs+=x.carbs||0;acc.fat+=x.fat||0;acc.fiber+=x.fiber||0;
+    Object.keys(x.micros||{}).forEach(k=>{acc.micros[k]=(acc.micros[k]||0)+(x.micros[k]||0);});
     return acc;
   },{calories:0,protein:0,carbs:0,fat:0,fiber:0,micros:{}});
 
-  const weekTotals=getLast7Days().reduce((acc,d)=>{
-    (entries[d]||[]).forEach(e=>{acc.calories+=e.calories||0;acc.protein+=e.protein||0;acc.carbs+=e.carbs||0;acc.fat+=e.fat||0;});
+  const weekTotals=last7().reduce((acc,d)=>{
+    (entries[d]||[]).forEach(x=>{acc.calories+=x.calories||0;acc.protein+=x.protein||0;acc.carbs+=x.carbs||0;acc.fat+=x.fat||0;});
     return acc;
   },{calories:0,protein:0,carbs:0,fat:0});
 
@@ -730,446 +673,452 @@ User's data:
   const calStatus=totals.calories>goals.calories?'over':totals.calories>goals.calories*.9?'near':'ok';
   const calColor=calStatus==='over'?'#e03030':calStatus==='near'?'#f0b429':'#ff6b1a';
 
-  if(!initDone)return React.createElement('div',{style:{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px',background:'var(--bg)'}},
-    React.createElement('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'28px',color:'var(--accent)'}}, 'GRAMS'),
-    React.createElement('div',{style:{width:'18px',height:'18px',border:'2px solid var(--border2)',borderTopColor:'var(--accent)',borderRadius:'50%',animation:'spin .7s linear infinite'}})
+  // ── Loading screen ───────────────────────────────────────────
+  if(!initDone)return e('div',{style:{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px',background:'var(--bg)'}},
+    e('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'28px',color:'var(--accent)'}},'GRAMS'),
+    e('div',{style:{width:'18px',height:'18px',border:'2px solid var(--border2)',borderTopColor:'var(--accent)',borderRadius:'50%',animation:'spin .7s linear infinite'}})
   );
 
-  return React.createElement('div',{className:'app'},
-    pendingFood&&React.createElement(EstimateDialog,{food:pendingFood,onChoose:handleEstimateChoice}),
-    showLibrary&&React.createElement('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.85)',zIndex:200,display:'flex',alignItems:'flex-end',justifyContent:'center'},onClick:()=>setShowLibrary(false)},
-      React.createElement('div',{style:{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--radius) var(--radius) 0 0',width:'100%',maxWidth:'500px',maxHeight:'80vh',display:'flex',flexDirection:'column',padding:'20px'},onClick:e=>e.stopPropagation()},
-        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
-          React.createElement('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'18px'}},'My food library'),
-          React.createElement('button',{onClick:()=>setShowLibrary(false),style:{fontSize:'16px',color:'var(--text3)',cursor:'pointer'}},'✕')
+  // ── Sidebar ──────────────────────────────────────────────────
+  function Sidebar(){
+    return e('aside',{className:'sidebar'},
+      e('div',{className:'sidebar-top'},
+        e('div',{className:'mode-tabs'},
+          e('div',{className:'mode-tab'+(inputMode==='ai'?' active':''),onClick:()=>setInputMode('ai')},'🤖 AI'),
+          e('div',{className:'mode-tab'+(inputMode==='manual'?' active':''),onClick:()=>setInputMode('manual')},'✏️ Manual'),
+          e('div',{className:'mode-tab',onClick:()=>setShowLibrary(true)},'📚 Library')
         ),
-        React.createElement('input',{type:'text',placeholder:'Search saved foods…',value:librarySearch,onChange:e=>setLibrarySearch(e.target.value),style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'8px 12px',color:'var(--text)',fontSize:'13px',outline:'none',marginBottom:'12px',width:'100%'}}),
-        React.createElement('div',{style:{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:'7px'}},
+
+        inputMode==='ai'?e('div',null,
+          e('input',{className:'meal-name-input',type:'text',placeholder:'Meal name (optional — e.g. Breakfast)',value:mealName,onChange:x=>setMealName(x.target.value)}),
+          e('div',{className:'chat-row'},
+            e('textarea',{className:'chat-ta',placeholder:'e.g. "2 eggs in butter" or "McDonald\'s Meal 2"',value:aiText,onChange:x=>setAiText(x.target.value),onKeyDown:x=>{if(x.key==='Enter'&&!x.shiftKey){x.preventDefault();handleSend();}},rows:2}),
+            e('button',{className:'send-btn',onClick:handleSend,disabled:loading||!aiText.trim()},loading?'…':'↑')
+          ),
+          e('div',{className:'sub-btns'},
+            e('button',{className:'sub-btn'+(showOverride?' on':''),onClick:()=>setShowOverride(p=>!p)},'⚙ Override'),
+          ),
+          showOverride&&e('div',{className:'override-panel'},
+            e('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.05em'}},'Override AI values (blank = use AI estimate)'),
+            e('div',{className:'override-grid'},
+              [['calories','kcal'],['protein','P (g)'],['carbs','C (g)'],['fat','F (g)'],['fiber','Fi (g)']].map(([k,lbl])=>
+                e('div',{key:k,className:'override-field'},
+                  e('label',null,lbl),
+                  e('input',{type:'number',placeholder:'auto',value:override[k],onChange:x=>setOverride(p=>({...p,[k]:x.target.value}))})
+                )
+              )
+            )
+          ),
+          e('p',{className:'hint'},'AI estimates macros — restaurant meals, ingredients, anything')
+        ):e('div',null,
+          e('div',{style:{display:'flex',flexDirection:'column',gap:'4px',marginBottom:'8px'}},
+            e('label',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.04em'}},'Food name'),
+            e('input',{type:'text',placeholder:'e.g. Electrolyte drink',value:manual.name,onChange:x=>setManual(p=>({...p,name:x.target.value})),style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}})
+          ),
+          e('div',{className:'manual-grid'},
+            [['calories','Calories (kcal)'],['protein','Protein (g)'],['carbs','Carbs (g)'],['fat','Fat (g)'],['fiber','Fiber (g)']].map(([k,lbl])=>
+              e('div',{key:k,className:'manual-field'},e('label',null,lbl),e('input',{type:'number',placeholder:'0',value:manual[k],onChange:x=>setManual(p=>({...p,[k]:x.target.value}))}))
+            )
+          ),
+          e('button',{className:'add-btn',onClick:handleManualAdd},'Add to log')
+        )
+      ),
+
+      e('div',{className:'log'},
+        todayEntries.length===0&&e('div',{className:'empty'},
+          e('div',{className:'empty-icon'},'🍽️'),
+          e('div',null,'Nothing logged today'),
+          e('div',{style:{marginTop:'5px',fontSize:'11px'}},'Use AI or manual input above')
+        ),
+        todayEntries.map(entry=>e('div',{key:entry.id,className:'log-item'},
+          e('div',{className:'log-header'},
+            e('div',{style:{flex:1,minWidth:0}},
+              e('span',{className:'log-name',style:entry.isError?{color:'var(--danger)',fontSize:'12px'}:{}},entry.name),
+              entry.description&&e('div',{className:'log-desc'},entry.description)
+            ),
+            e('div',{style:{display:'flex',alignItems:'center',gap:'5px'}},
+              e('span',{className:'log-time'},entry.time),
+              !entry.isError&&e('button',{className:'log-del',onClick:()=>deleteEntry(tod,entry.id)},'✕')
+            )
+          ),
+          !entry.isError&&e('div',{className:'log-pills'},
+            e('span',{className:'mp cal'},(entry.calories||0)+' kcal'),
+            e('span',{className:'mp p'},'P '+(entry.protein||0)+'g'),
+            e('span',{className:'mp c'},'C '+(entry.carbs||0)+'g'),
+            e('span',{className:'mp f'},'F '+(entry.fat||0)+'g'),
+            (entry.fiber||0)>0&&e('span',{className:'mp fi'},'Fi '+entry.fiber+'g')
+          ),
+          !entry.isError&&settings.showMealBars&&e(MealBarViz,{entry,expanded:expandedMeals[entry.id],onToggle:()=>setExpandedMeals(p=>({...p,[entry.id]:!p[entry.id]}))}),
+          !entry.isError&&e('button',{className:'log-save-btn',onClick:()=>saveToLibrary(entry)},'+ save to library')
+        )),
+        loading&&e('div',{className:'log-item',style:{background:'var(--accent-dim)',border:'1px solid rgba(255,107,26,.2)'}},
+          e('div',{style:{fontSize:'12px',color:'var(--accent)',marginBottom:'5px'}},'🔍 Looking up nutrition info…'),
+          e(Bubble)
+        ),
+        e('div',{ref:logRef})
+      )
+    );
+  }
+
+  // ── Content areas ────────────────────────────────────────────
+  function ContentToday(){
+    return e('div',null,
+      e('h1',{className:'section-title'},"Today's overview"),
+      e('div',{className:'grid-2',style:{gap:'14px',marginBottom:'14px'}},
+        e('div',{className:'card',style:{marginBottom:0}},
+          e('div',{className:'card-title'},'Calories'),
+          e('div',{style:{display:'flex',alignItems:'baseline',gap:'4px',marginBottom:'10px'}},
+            e('span',{className:'stat-big',style:{color:calColor}},Math.round(totals.calories)),
+            e('span',{className:'stat-unit'},'/ '+goals.calories+' kcal')
+          ),
+          e('div',{className:'pbar'},e('div',{className:'pfill',style:{width:Math.min(100,(totals.calories/goals.calories)*100)+'%',background:calColor}})),
+          e('div',{style:{marginTop:'7px',fontSize:'12px',color:'var(--text2)'}},
+            goals.calories-totals.calories>0?Math.round(goals.calories-totals.calories)+' kcal remaining':Math.round(totals.calories-goals.calories)+' kcal over'
+          )
+        ),
+        e('div',{className:'card',style:{marginBottom:0}},
+          e('div',{className:'card-title'},'Macro split'),
+          e(PieChart,{protein:totals.protein,carbs:totals.carbs,fat:totals.fat})
+        )
+      ),
+      e('div',{className:'card'},
+        e('div',{className:'card-title'},'Macronutrients'),
+        e(MacroBar,{label:'Protein',current:totals.protein,goal:goals.protein,color:'#ff6b1a'}),
+        e(MacroBar,{label:'Carbohydrates',current:totals.carbs,goal:goals.carbs,color:'#f0b429'}),
+        e(MacroBar,{label:'Fat',current:totals.fat,goal:goals.fat,color:'#e08c3a'}),
+        totals.fiber>0&&e(MacroBar,{label:'Fiber',current:totals.fiber,goal:30,color:'#c97a30'})
+      ),
+      settings.advancedMode&&e('div',{className:'card'},
+        e('div',{className:'card-title'},'🔬 Micronutrients'),
+        e('div',{className:'micro-grid'},
+          Object.keys(MICRO_GOALS).map(k=>{
+            const info=MICRO_GOALS[k],val=Math.round(totals.micros[k]||0),pct=Math.min(100,(val/info.goal)*100);
+            return e('div',{key:k,className:'micro-item'},
+              e('div',{className:'micro-name'},info.label),
+              e('div',{className:'micro-val'},val+info.unit),
+              e('div',{className:'micro-bar'},e('div',{className:'micro-fill',style:{width:pct+'%',background:MICRO_COLORS[k]}})),
+              e('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'3px'}},Math.round(pct)+'% of '+info.goal+info.unit)
+            );
+          })
+        )
+      )
+    );
+  }
+
+  function ContentWeek(){
+    return e('div',null,
+      e('h1',{className:'section-title'},'Weekly summary'),
+      e('div',{className:'card'},e('div',{className:'card-title'},'Calories — last 7 days'),e(WeekChart,{entries})),
+      e('div',{className:'grid-2',style:{gap:'14px',marginBottom:'14px'}},
+        [['Total calories',Math.round(weekTotals.calories),'kcal'],['Daily average',Math.round(weekTotals.calories/7),'kcal'],['Total protein',Math.round(weekTotals.protein),'g'],['Avg protein/day',Math.round(weekTotals.protein/7),'g']].map(([lbl,val,unit])=>
+          e('div',{key:lbl,className:'card',style:{marginBottom:0}},
+            e('div',{className:'card-title'},lbl),
+            e('div',{style:{display:'flex',alignItems:'baseline',gap:'3px'}},
+              e('span',{className:'stat-big',style:{fontSize:'26px'}},val),
+              e('span',{className:'stat-unit'},unit)
+            )
+          )
+        )
+      ),
+      e('div',{className:'card'},
+        e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
+          e('div',{className:'card-title',style:{margin:0}},'✨ AI nutrition coach'),
+          e('button',{className:'save-btn',style:{fontSize:'12px',padding:'7px 13px'},onClick:getAdvice,disabled:adviceLoading},adviceLoading?'Analysing…':'Get advice')
+        ),
+        adviceLoading&&e(Bubble),
+        aiAdvice&&e('div',null,e('div',{className:'ai-hdr'},'🤖 AI Coach'),e('div',{className:'ai-box'},aiAdvice)),
+        !aiAdvice&&!adviceLoading&&e('div',{className:'empty',style:{padding:'16px 0'}},'Click "Get advice" for a personalised weekly analysis')
+      )
+    );
+  }
+
+  function ContentChat(){
+    return e('div',{style:{display:'flex',flexDirection:'column',height:'calc(100vh - 120px)'}},
+      e('h1',{className:'section-title'},'Ask GRAMS'),
+      e('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'14px',marginTop:'-12px'}},'Ask anything — "Can I fit a burger in today?" • "How\'s my protein?" • "What can I eat for 400 kcal?"'),
+      e('div',{className:'chat-msgs'},
+        chatMsgs.length===0&&e('div',{className:'empty',style:{padding:'16px 0'}},
+          e('div',{className:'empty-icon'},'🤖'),
+          e('div',{style:{marginBottom:'12px'}},'Ask me anything about your nutrition'),
+          e('div',{style:{display:'flex',flexDirection:'column',gap:'6px'}},
+            ['"Can I have a Big Mac today?"','"Am I hitting my protein this week?"','"What can I eat for 400 kcal tonight?"','"How do I reach my body fat goal?"'].map(q=>
+              e('button',{key:q,className:'chat-suggestion',onClick:()=>setChatInput(q)},q)
+            )
+          )
+        ),
+        chatMsgs.map((m,i)=>e('div',{key:i,className:'chat-msg '+m.role},m.text)),
+        chatLoading&&e('div',{className:'chat-msg ai'},e(Bubble)),
+        e('div',{ref:chatRef})
+      ),
+      e('div',{style:{display:'flex',gap:'7px'}},
+        e('textarea',{className:'chat-ta',style:{flex:1},placeholder:'Ask anything…',value:chatInput,onChange:x=>setChatInput(x.target.value),onKeyDown:x=>{if(x.key==='Enter'&&!x.shiftKey){x.preventDefault();handleChat();}},rows:2}),
+        e('button',{className:'send-btn',onClick:handleChat,disabled:chatLoading||!chatInput.trim()},chatLoading?'…':'↑')
+      )
+    );
+  }
+
+  function ContentGoals(){
+    return e('div',null,
+      e('h1',{className:'section-title'},'Goals & profile'),
+      e('div',{className:'card'},
+        e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
+          e('div',{className:'card-title',style:{margin:0}},'Body stats'),
+          e('div',{style:{display:'flex',gap:'2px',background:'var(--surface3)',padding:'3px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)'}},
+            ['kg','lbs'].map(u=>e('button',{key:u,onClick:()=>setWeightUnit(u),style:{padding:'3px 10px',borderRadius:'5px',fontSize:'11px',fontWeight:600,cursor:'pointer',background:weightUnit===u?'var(--accent)':'transparent',color:weightUnit===u?'#0a0a08':'var(--text3)',border:'none',transition:'all .15s'}},u))
+          )
+        ),
+        e('div',{className:'grid-2',style:{gap:'10px'}},
+          [['weight','Current weight'],['target_weight','Target weight'],['body_fat','Body fat (%)'],['target_body_fat','Target body fat (%)']].map(([k,lbl])=>{
+            const isW=k==='weight'||k==='target_weight';
+            return e('div',{key:k,className:'goal-row',style:{marginBottom:0}},
+              e('label',null,lbl+(isW?' ('+unitLbl+')':' (%)')),
+              e('input',{type:'number',placeholder:String(isW?toDisplay(goals[k]):goals[k]),value:goalInput[k]!==undefined?goalInput[k]:'',onChange:x=>setGoalInput(p=>({...p,[k]:x.target.value}))})
+            );
+          })
+        )
+      ),
+      e('div',{className:'card'},
+        e('div',{className:'card-title'},'Daily macro targets'),
+        e('div',{className:'grid-2',style:{gap:'10px'}},
+          [['calories','Calories (kcal)'],['protein','Protein (g)'],['carbs','Carbohydrates (g)'],['fat','Fat (g)']].map(([k,lbl])=>
+            e('div',{key:k,className:'goal-row',style:{marginBottom:0}},
+              e('label',null,lbl),
+              e('input',{type:'number',placeholder:String(goals[k]),value:goalInput[k]!==undefined?goalInput[k]:'',onChange:x=>setGoalInput(p=>({...p,[k]:x.target.value}))})
+            )
+          )
+        ),
+        e('div',{style:{marginTop:'14px'}},e('button',{className:'save-btn',onClick:saveGoals},'Save goals'))
+      ),
+      e('div',{className:'card'},
+        e('div',{className:'card-title'},'Active goals'),
+        e('div',{style:{display:'flex',flexWrap:'wrap',gap:'8px'}},
+          [['⚡',goals.calories+' kcal/day','#ff6b1a'],['🥩',goals.protein+'g protein','#ff6b1a'],['🌾',goals.carbs+'g carbs','#f0b429'],['🥑',goals.fat+'g fat','#e08c3a'],['⚖️',toDisplay(goals.weight)+'→'+toDisplay(goals.target_weight)+unitLbl,'var(--text2)'],['💪',goals.body_fat+'%→'+goals.target_body_fat+'% BF','var(--text2)']].map(([icon,lbl,color])=>
+            e('div',{key:lbl,style:{display:'flex',alignItems:'center',gap:'5px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'7px 11px',fontSize:'12px',color}},icon,' ',lbl)
+          )
+        )
+      )
+    );
+  }
+
+  function ContentHistory(){
+    return e('div',null,
+      e('h1',{className:'section-title'},'Food history'),
+      allEntries.length===0&&e('div',{className:'card'},e('div',{className:'empty'},e('div',{className:'empty-icon'},'📋'),'No history yet')),
+      allEntries.map(([date,dayEntries])=>{
+        const t=dayEntries.reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
+        const d=new Date(date+'T12:00:00');
+        const lbl=date===tod?'Today':d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+        return e('div',{key:date,className:'card'},
+          e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
+            e('div',{style:{fontSize:'14px',fontWeight:500}},lbl),
+            e('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap'}},
+              e('span',{className:'mp cal'},Math.round(t.cal)+' kcal'),
+              e('span',{className:'mp p'},'P '+Math.round(t.p)+'g'),
+              e('span',{className:'mp c'},'C '+Math.round(t.c)+'g'),
+              e('span',{className:'mp f'},'F '+Math.round(t.f)+'g')
+            )
+          ),
+          dayEntries.filter(x=>!x.isError).map(entry=>
+            e('div',{key:entry.id},
+              e('div',{className:'hist-entry'},
+                e('div',{style:{flex:1,minWidth:0}},
+                  editingName&&editingName.id===entry.id
+                    ?e('div',{style:{display:'flex',gap:'5px',alignItems:'center'}},
+                        e('input',{autoFocus:true,className:'inline-input',style:{flex:1},value:editingName.value,onChange:x=>setEditingName(p=>({...p,value:x.target.value})),onKeyDown:x=>{if(x.key==='Enter')updateName(date,entry.id,editingName.value);if(x.key==='Escape')setEditingName(null);},onBlur:()=>updateName(date,entry.id,editingName.value)}),
+                        e('span',{style:{fontSize:'10px',color:'var(--text3)',cursor:'pointer'},onClick:()=>setEditingName(null)},'✕')
+                      )
+                    :e('div',{className:'hist-name',title:'Click to rename',onClick:()=>setEditingName({id:entry.id,date,value:entry.name})},
+                        entry.name,' ',e('span',{style:{fontSize:'10px',color:'var(--text3)',fontWeight:'normal'}},'(rename)')
+                      ),
+                  entry.description&&e('div',{className:'hist-desc'},entry.description)
+                ),
+                e('div',{style:{display:'flex',gap:'5px',alignItems:'center',flexShrink:0,marginLeft:'8px'}},
+                  e('span',{style:{color:'var(--text2)',fontSize:'12px'}},entry.calories+' kcal'),
+                  e('button',{onClick:()=>deleteEntry(date,entry.id),style:{fontSize:'11px',color:'var(--text3)',cursor:'pointer'},onMouseEnter:x=>x.target.style.color='var(--danger)',onMouseLeave:x=>x.target.style.color='var(--text3)'},'✕')
+                )
+              ),
+              e('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',paddingBottom:'6px'}},
+                [['calories','cal','kcal','cal'],['protein','p','g','P '],['carbs','c','g','C '],['fat','f','g','F '],['fiber','fi','g','Fi ']].map(([field,cls,unit,prefix])=>
+                  editingMacro&&editingMacro.id===entry.id&&editingMacro.field===field
+                    ?e('input',{key:field,autoFocus:true,type:'number',className:'inline-input',style:{width:'70px'},value:editingMacro.value,onChange:x=>setEditingMacro(p=>({...p,value:x.target.value})),onKeyDown:x=>{if(x.key==='Enter')updateMacro(date,entry.id,field,editingMacro.value);if(x.key==='Escape')setEditingMacro(null);},onBlur:()=>updateMacro(date,entry.id,field,editingMacro.value)})
+                    :e('span',{key:field,className:'mp '+cls+' hist-pill',title:'Click to edit',onClick:()=>setEditingMacro({id:entry.id,date,field,value:String(entry[field]||0)})},
+                        field==='calories'?(entry.calories||0)+' kcal':prefix+(entry[field]||0)+'g'
+                      )
+                )
+              )
+            )
+          )
+        );
+      })
+    );
+  }
+
+  function ContentAdvice(){
+    return e('div',null,
+      e('h1',{className:'section-title'},'AI advice history'),
+      adviceHistory.length===0&&e('div',{className:'card'},e('div',{className:'empty'},e('div',{className:'empty-icon'},'🤖'),'No advice yet — go to Week and click "Get advice"')),
+      adviceHistory.map(a=>e('div',{key:a.id,className:'advice-item'},
+        e('div',{className:'advice-date'},new Date(a.created_at).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
+        e('div',{className:'advice-text'},a.advice)
+      ))
+    );
+  }
+
+  function ContentSettings(){
+    return e('div',null,
+      e('h1',{className:'section-title'},'Settings'),
+      e('div',{className:'card'},
+        e('div',{className:'card-title'},'Tracking'),
+        e('div',{className:'toggle-row'},
+          e('div',null,e('div',{className:'toggle-lbl'},'Advanced mode'),e('div',{className:'toggle-desc'},'Track vitamins & minerals')),
+          e('div',{className:'toggle'+(settings.advancedMode?' on':''),onClick:()=>updateSetting('advancedMode',!settings.advancedMode)})
+        ),
+        e('div',{className:'toggle-row'},
+          e('div',null,e('div',{className:'toggle-lbl'},'Meal macro bars'),e('div',{className:'toggle-desc'},'Show colour bar on each log entry')),
+          e('div',{className:'toggle'+(settings.showMealBars?' on':''),onClick:()=>updateSetting('showMealBars',!settings.showMealBars)})
+        )
+      ),
+      e('div',{className:'card'},
+        e('div',{className:'card-title'},'AI estimate preference'),
+        e('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'12px'}},'When AI estimates food macros, which value should be logged?'),
+        [['ask','Ask me each time','A popup lets you choose under / avg / over'],['under','Always use lower estimate','Good for cutting / weight loss'],['avg','Always use average','Balanced and accurate'],['over','Always use higher estimate','Good for bulking / gaining']].map(([opt,lbl,desc])=>
+          e('div',{key:opt,className:'radio-row',onClick:()=>updateSetting('estimateMode',opt)},
+            e('div',null,e('div',{className:'toggle-lbl'},lbl),e('div',{className:'toggle-desc'},desc)),
+            e('div',{className:'radio-dot'+(settings.estimateMode===opt?' on':'')})
+          )
+        )
+      ),
+      e('div',{className:'card'},
+        e('div',{className:'card-title'},'Account'),
+        e('button',{className:'save-btn',style:{background:'rgba(224,48,48,.15)',color:'var(--danger)',marginRight:'10px'},onClick:()=>setShowConfirm(true)},'Clear all data'),
+        e('button',{className:'save-btn',style:{background:'var(--surface2)',color:'var(--text2)',border:'1px solid var(--border)'},onClick:onLogout},'Sign out')
+      )
+    );
+  }
+
+  const VIEWS={today:ContentToday,week:ContentWeek,chat:ContentChat,goals:ContentGoals,history:ContentHistory,advice:ContentAdvice,settings:ContentSettings};
+  const CurrentView=VIEWS[view]||ContentToday;
+
+  // ── Render ───────────────────────────────────────────────────
+  return e('div',{className:'app'},
+
+    // Estimate overlay
+    pendingFood&&e('div',{className:'overlay'},
+      e('div',{className:'overlay-box'},
+        e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
+          e('div',{className:'overlay-title'},'Which estimate?'),
+          e('span',{className:'overlay-close',onClick:()=>setPendingFood(null)},'✕')
+        ),
+        e('div',{style:{fontSize:'13px',color:'var(--accent)',fontWeight:500,marginBottom:'4px'}},mealName.trim()||pendingFood.name),
+        e('div',{style:{fontSize:'12px',color:'var(--text2)',marginBottom:'16px',lineHeight:1.7}},
+          'Under: '+pendingFood.under.calories+' kcal | '+pendingFood.under.protein+'p '+pendingFood.under.carbs+'c '+pendingFood.under.fat+'f\n'+
+          'Avg: '+pendingFood.avg.calories+' kcal | '+pendingFood.avg.protein+'p '+pendingFood.avg.carbs+'c '+pendingFood.avg.fat+'f\n'+
+          'Over: '+pendingFood.over.calories+' kcal | '+pendingFood.over.protein+'p '+pendingFood.over.carbs+'c '+pendingFood.over.fat+'f'
+        ),
+        e('div',{className:'estimate-btns'},
+          e('button',{className:'ebtn under',onClick:()=>handleEstimate('under')},'⬇ Under'),
+          e('button',{className:'ebtn avg',onClick:()=>handleEstimate('avg')},'≈ Average'),
+          e('button',{className:'ebtn over',onClick:()=>handleEstimate('over')},'⬆ Over')
+        )
+      )
+    ),
+
+    // Library overlay
+    showLibrary&&e('div',{className:'overlay',onClick:()=>setShowLibrary(false)},
+      e('div',{className:'overlay-box',onClick:x=>x.stopPropagation()},
+        e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
+          e('div',{className:'overlay-title'},'My food library'),
+          e('span',{className:'overlay-close',onClick:()=>setShowLibrary(false)},'✕')
+        ),
+        e('input',{className:'lib-search',type:'text',placeholder:'Search saved foods…',value:libSearch,onChange:x=>setLibSearch(x.target.value)}),
+        e('div',{className:'lib-list'},
           savedFoods.length===0
-            ? React.createElement('div',{className:'empty-state'},React.createElement('div',{className:'empty-icon'},'📚'),'No saved foods yet','',React.createElement('div',{style:{marginTop:'6px',fontSize:'11px'}},'Log a food and tap "+ save to library"'))
-            : savedFoods
-                .filter(f=>!librarySearch||f.name.toLowerCase().includes(librarySearch.toLowerCase()))
-                .map(food=>React.createElement('div',{key:food.id,style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px 12px',display:'flex',justifyContent:'space-between',alignItems:'center',gap:'8px'}},
-                  React.createElement('div',{style:{flex:1,minWidth:0}},
-                    React.createElement('div',{style:{fontSize:'13px',fontWeight:500,color:'var(--text)',marginBottom:'3px'}},food.name),
-                    food.description&&React.createElement('div',{style:{fontSize:'10px',color:'var(--text3)',marginBottom:'3px',fontStyle:'italic'}},food.description),
-                    React.createElement('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap'}},
-                      React.createElement('span',{className:'mp cal'},(food.calories||0)+' kcal'),
-                      React.createElement('span',{className:'mp p'},'P '+(food.protein||0)+'g'),
-                      React.createElement('span',{className:'mp c'},'C '+(food.carbs||0)+'g'),
-                      React.createElement('span',{className:'mp f'},'F '+(food.fat||0)+'g'),
-                      food.use_count>1&&React.createElement('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 5px'}},'×'+food.use_count)
+            ?e('div',{className:'empty'},e('div',{className:'empty-icon'},'📚'),'No saved foods yet',e('div',{style:{marginTop:'6px',fontSize:'11px'}},'Log a food and tap "+ save to library"'))
+            :savedFoods.filter(f=>!libSearch||f.name.toLowerCase().includes(libSearch.toLowerCase())).map(food=>
+                e('div',{key:food.id,className:'lib-item'},
+                  e('div',{style:{flex:1,minWidth:0}},
+                    e('div',{style:{fontSize:'13px',fontWeight:500,marginBottom:'2px'}},food.name),
+                    food.description&&e('div',{style:{fontSize:'10px',color:'var(--text3)',fontStyle:'italic',marginBottom:'3px'}},food.description),
+                    e('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap'}},
+                      e('span',{className:'mp cal'},(food.calories||0)+' kcal'),
+                      e('span',{className:'mp p'},'P '+(food.protein||0)+'g'),
+                      e('span',{className:'mp c'},'C '+(food.carbs||0)+'g'),
+                      e('span',{className:'mp f'},'F '+(food.fat||0)+'g'),
+                      food.use_count>1&&e('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 4px'}},'×'+food.use_count)
                     )
                   ),
-                  React.createElement('div',{style:{display:'flex',gap:'6px',flexShrink:0}},
-                    React.createElement('button',{onClick:()=>logFromLibrary(food),style:{padding:'6px 12px',background:'var(--accent)',color:'#0a0a08',border:'none',borderRadius:'var(--radius-sm)',fontSize:'12px',fontWeight:700,cursor:'pointer'}},'Log'),
-                    React.createElement('button',{onClick:()=>deleteFromLibrary(food.id),style:{padding:'6px 8px',background:'rgba(224,48,48,.1)',color:'var(--danger)',border:'1px solid rgba(224,48,48,.2)',borderRadius:'var(--radius-sm)',fontSize:'12px',cursor:'pointer'}},'✕')
+                  e('div',{className:'lib-btns'},
+                    e('button',{className:'lib-log',onClick:()=>logFromLibrary(food)},'Log'),
+                    e('button',{className:'lib-del',onClick:()=>deleteFromLibrary(food.id)},'✕')
                   )
-                ))
+                )
+              )
         )
       )
     ),
-    showConfirm&&React.createElement(ConfirmDialog,{title:'Clear all data?',text:'Permanently deletes all food entries and AI advice from your account.',onYes:clearAll,onNo:()=>setShowConfirm(false)}),
 
-    // HEADER
-    React.createElement('header',{className:'header'},
-      React.createElement('div',{className:'logo'},'GRAMS'),
-      React.createElement('nav',{className:'nav'},
+    // Confirm overlay
+    showConfirm&&e('div',{className:'overlay',onClick:()=>setShowConfirm(false)},
+      e('div',{className:'overlay-box',style:{borderRadius:'var(--radius)',maxWidth:'340px',margin:'auto'},onClick:x=>x.stopPropagation()},
+        e('div',{className:'overlay-title'},'Clear all data?'),
+        e('div',{style:{fontSize:'13px',color:'var(--text2)',margin:'8px 0 20px',lineHeight:1.5}},'This permanently deletes all food entries and AI advice from your account.'),
+        e('div',{className:'confirm-btns'},
+          e('button',{className:'cbtn-no',onClick:()=>setShowConfirm(false)},'Cancel'),
+          e('button',{className:'cbtn-yes',onClick:clearAll},'Clear all')
+        )
+      )
+    ),
+
+    // Header
+    e('header',{className:'header'},
+      e('div',{className:'logo'},'GRAMS'),
+      e('nav',{className:'nav-desktop'},
         ['today','week','chat','goals','history','advice','settings'].map(v=>
-          React.createElement('button',{key:v,className:'nav-btn'+(view===v?' active':''),onClick:()=>setView(v)},
-            v.charAt(0).toUpperCase()+v.slice(1)
-          )
+          e('button',{key:v,className:'nav-btn'+(view===v?' active':''),onClick:()=>setView(v)},v.charAt(0).toUpperCase()+v.slice(1))
         )
       ),
-      React.createElement('div',{className:'header-right'},
-        syncing&&React.createElement('div',{className:'syncing'},React.createElement('div',{className:'spinner-sm'}),'Syncing'),
-        React.createElement('div',{className:'hbtn',style:{color:'var(--text2)',cursor:'default'}},user.email?.split('@')[0]),
-        React.createElement('button',{className:'hbtn danger',onClick:()=>setShowConfirm(true)},'Clear'),
-        React.createElement('button',{className:'hbtn danger',onClick:onLogout},'Sign out')
+      e('div',{style:{display:'flex',alignItems:'center',gap:'7px'}},
+        syncing&&e('div',{className:'syncing'},e('div',{className:'spinner-sm'}),'Syncing'),
+        e('div',{style:{fontSize:'12px',color:'var(--text3)',padding:'4px 8px'}},user.email?.split('@')[0])
       )
     ),
 
-    React.createElement('nav',{className:'mobile-nav'},
-      [
-        {id:'today',label:'Today',icon:'🍽'},
-        {id:'week',label:'Week',icon:'📊'},
-        {id:'chat',label:'Chat',icon:'💬'},
-        {id:'goals',label:'Goals',icon:'🎯'},
-        {id:'settings',label:'More',icon:'⚙️'},
-      ].map(t=>React.createElement('button',{key:t.id,className:'mobile-nav-btn'+(view===t.id?' active':''),onClick:()=>setView(t.id)},
-        React.createElement('span',{style:{fontSize:'16px'}},t.icon),
-        t.label
-      ))
+    // Main layout
+    e('div',{className:'main'},
+      e(Sidebar),
+      e('div',{className:'content'},e(CurrentView))
     ),
-    React.createElement('main',{className:'main'},
 
-      // SIDEBAR
-      React.createElement('aside',{className:'sidebar'},
-        React.createElement('div',{className:'sidebar-top'},
-          React.createElement('div',{className:'input-mode-tabs'},
-            React.createElement('div',{className:'input-mode-tab'+(inputMode==='ai'?' active':''),onClick:()=>setInputMode('ai')},'🤖 AI Input'),
-            React.createElement('div',{className:'input-mode-tab'+(inputMode==='manual'?' active':''),onClick:()=>setInputMode('manual')},'✏️ Manual')
-          ),
-
-          inputMode==='ai'
-            ? React.createElement('div',null,
-                React.createElement('input',{type:'text',placeholder:'Meal name (optional — e.g. "Breakfast", "Post-workout")',value:mealName,onChange:e=>setMealName(e.target.value),style:{width:'100%',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'12px',outline:'none',marginBottom:'7px',transition:'border-color .15s'},onFocus:e=>e.target.style.borderColor='var(--accent)',onBlur:e=>e.target.style.borderColor='var(--border)'}),
-              React.createElement('div',{className:'chat-wrap'},
-                  React.createElement('textarea',{className:'chat-textarea',placeholder:'e.g. "2 eggs in butter" or "McDonald\'s Meal 2" or "i had a big mac"',value:input,onChange:e=>setInput(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}},rows:2}),
-                  React.createElement('button',{className:'send-btn',onClick:handleSend,disabled:loading||!input.trim()},loading?'…':'↑')
-                ),
-                React.createElement('div',{style:{display:'flex',gap:'6px',marginTop:'6px'}},
-                  React.createElement('button',{onClick:()=>setShowOverride(p=>!p),style:{fontSize:'11px',color:showOverride?'var(--accent)':'var(--text3)',background:'var(--surface2)',border:'1px solid '+(showOverride?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'5px',padding:'4px 8px',cursor:'pointer',transition:'all .15s'}},'⚙ Override macros'),
-                  React.createElement('button',{onClick:()=>setShowLibrary(true),style:{fontSize:'11px',color:'var(--text3)',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'4px 8px',cursor:'pointer',transition:'all .15s'},onMouseEnter:e=>e.target.style.color='var(--accent)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'📚 My foods')
-                ),
-                showOverride&&React.createElement('div',{style:{marginTop:'8px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px'}},
-                  React.createElement('div',{style:{fontSize:'10px',color:'var(--text3)',marginBottom:'7px',textTransform:'uppercase',letterSpacing:'.05em'}},'Override AI values (leave blank to use AI estimate)'),
-                  React.createElement('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'5px'}},
-                    [['calories','kcal'],['protein','P (g)'],['carbs','C (g)'],['fat','F (g)'],['fiber','Fi (g)']].map(([k,label])=>
-                      React.createElement('div',{key:k,style:{display:'flex',flexDirection:'column',gap:'3px'}},
-                        React.createElement('label',{style:{fontSize:'10px',color:'var(--text3)'}},label),
-                        React.createElement('input',{type:'number',placeholder:'auto',value:override[k],onChange:e=>setOverride(p=>({...p,[k]:e.target.value})),style:{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'5px',padding:'5px 8px',color:'var(--text)',fontSize:'12px',outline:'none',width:'100%'}})
-                      )
-                    )
-                  )
-                ),
-                React.createElement('p',{className:'hint'},'AI estimates macros — restaurant meals, recipes, anything')
-              )
-            : React.createElement('div',null,
-                React.createElement('div',{className:'manual-name'},
-                  React.createElement('label',null,'Food name'),
-                  React.createElement('input',{type:'text',placeholder:'e.g. Chicken & rice',value:manual.name,onChange:e=>setManual(p=>({...p,name:e.target.value}))})
-                ),
-                React.createElement('div',{className:'manual-grid'},
-                  [['calories','Calories (kcal)'],['protein','Protein (g)'],['carbs','Carbs (g)'],['fat','Fat (g)'],['fiber','Fiber (g)'],].map(([k,label])=>
-                    React.createElement('div',{key:k,className:'manual-field'},
-                      React.createElement('label',null,label),
-                      React.createElement('input',{type:'number',placeholder:'0',value:manual[k],onChange:e=>setManual(p=>({...p,[k]:e.target.value}))})
-                    )
-                  )
-                ),
-                React.createElement('button',{className:'add-btn',onClick:handleManualAdd},'Add to log')
-              )
-        ),
-
-        // LOG
-        React.createElement('div',{className:'log'},
-          todayEntries.length===0&&React.createElement('div',{className:'empty-state'},
-            React.createElement('div',{className:'empty-icon'},'🍽️'),
-            React.createElement('div',null,'Nothing logged today'),
-            React.createElement('div',{style:{marginTop:'5px',fontSize:'11px'}},'Use AI input or add macros manually')
-          ),
-          todayEntries.map(entry=>
-            React.createElement('div',{key:entry.id,className:'log-item'},
-              React.createElement('div',{className:'log-item-header'},
-                React.createElement('span',{className:'log-name',style:entry.isError?{color:'var(--danger)',fontSize:'12px'}:{}},entry.name),
-                React.createElement('div',{style:{display:'flex',alignItems:'center',gap:'5px'}},
-                  React.createElement('span',{className:'log-time'},entry.time),
-                  !entry.isError&&React.createElement('button',{className:'log-del',onClick:()=>deleteEntry(today,entry.id)},'✕')
-                )
-              ),
-              !entry.isError&&entry.description&&React.createElement('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'3px',lineHeight:1.3}},entry.description),
-              !entry.isError&&React.createElement('div',{className:'log-macros'},
-                React.createElement('span',{className:'mp cal'},(entry.calories||0)+' kcal'),
-                React.createElement('span',{className:'mp p'},'P '+(entry.protein||0)+'g'),
-                React.createElement('span',{className:'mp c'},'C '+(entry.carbs||0)+'g'),
-                React.createElement('span',{className:'mp f'},'F '+(entry.fat||0)+'g'),
-                (entry.fiber||0)>0&&React.createElement('span',{className:'mp fi'},'Fi '+entry.fiber+'g')
-              ),
-              !entry.isError&&settings.showMealBars&&React.createElement(MealBar,{
-                entry,
-                expanded:expandedMeals[entry.id],
-                onToggle:()=>setExpandedMeals(prev=>({...prev,[entry.id]:!prev[entry.id]}))
-              })
-            )
-          ),
-          loading&&React.createElement('div',{className:'log-item',style:{background:'var(--accent-dim)',border:'1px solid rgba(255,107,26,.2)'}},
-            React.createElement('div',{className:'log-name',style:{color:'var(--accent)',fontSize:'12px'}},'🔍 Looking up nutrition info…'),
-            React.createElement('div',{className:'loading-bubble'},React.createElement('span'),React.createElement('span'),React.createElement('span'))
-          ),
-          React.createElement('div',{ref:logEndRef})
-        )
-      ),
-
-      // CONTENT
-      React.createElement('div',{className:'content'},
-
-        // TODAY
-        view==='today'&&React.createElement('div',null,
-          React.createElement('h1',{className:'section-title'},"Today's overview"),
-          React.createElement('div',{className:'grid-2',style:{marginBottom:'14px'}},
-            React.createElement('div',{className:'card'},
-              React.createElement('div',{className:'card-title'},'Calories'),
-              React.createElement('div',{style:{display:'flex',alignItems:'baseline',gap:'5px',marginBottom:'10px'}},
-                React.createElement('span',{className:'stat-big',style:{color:calColor}},Math.round(totals.calories)),
-                React.createElement('span',{className:'stat-unit'},'/ '+goals.calories+' kcal')
-              ),
-              React.createElement('div',{className:'progress-bar'},React.createElement('div',{className:'progress-fill',style:{width:Math.min(100,(totals.calories/goals.calories)*100)+'%',background:calColor}})),
-              React.createElement('div',{style:{marginTop:'7px',fontSize:'12px',color:'var(--text2)'}},
-                goals.calories-totals.calories>0?Math.round(goals.calories-totals.calories)+' kcal remaining':Math.round(totals.calories-goals.calories)+' kcal over goal'
-              )
-            ),
-            React.createElement('div',{className:'card'},
-              React.createElement('div',{className:'card-title'},'Macro split'),
-              React.createElement(PieChart,{protein:totals.protein,carbs:totals.carbs,fat:totals.fat})
-            )
-          ),
-          React.createElement('div',{className:'card',style:{marginBottom:'14px'}},
-            React.createElement('div',{className:'card-title'},'Macronutrients'),
-            React.createElement('div',{style:{display:'flex',flexDirection:'column',gap:'12px'}},
-              React.createElement(MacroBar,{label:'Protein',current:totals.protein,goal:goals.protein,color:'#ff6b1a'}),
-              React.createElement(MacroBar,{label:'Carbohydrates',current:totals.carbs,goal:goals.carbs,color:'#f0b429'}),
-              React.createElement(MacroBar,{label:'Fat',current:totals.fat,goal:goals.fat,color:'#e08c3a'}),
-              totals.fiber>0&&React.createElement(MacroBar,{label:'Fiber',current:totals.fiber,goal:30,color:'#c97a30'})
-            )
-          ),
-          settings.advancedMode&&React.createElement('div',{className:'card'},
-            React.createElement('div',{className:'card-title'},'🔬 Micronutrients'),
-            React.createElement('div',{className:'micro-grid'},
-              Object.keys(MICRO_GOALS).map(k=>{
-                const info=MICRO_GOALS[k],val=Math.round(totals.micros[k]||0),pct=Math.min(100,(val/info.goal)*100);
-                return React.createElement('div',{key:k,className:'micro-item'},
-                  React.createElement('div',{className:'micro-name'},info.label),
-                  React.createElement('div',{className:'micro-val'},val+info.unit),
-                  React.createElement('div',{className:'micro-goal-bar'},React.createElement('div',{className:'micro-goal-fill',style:{width:pct+'%',background:MICRO_COLORS[k]}})),
-                  React.createElement('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'3px'}},Math.round(pct)+'% of '+info.goal+info.unit)
-                );
-              })
-            )
-          )
-        ),
-
-        // WEEK
-        view==='week'&&React.createElement('div',null,
-          React.createElement('h1',{className:'section-title'},'Weekly summary'),
-          React.createElement('div',{className:'card',style:{marginBottom:'14px'}},
-            React.createElement('div',{className:'card-title'},'Calories — last 7 days'),
-            React.createElement(WeekChart,{entries})
-          ),
-          React.createElement('div',{className:'grid-2',style:{marginBottom:'14px'}},
-            [['Total calories',Math.round(weekTotals.calories),'kcal'],['Daily average',Math.round(weekTotals.calories/7),'kcal'],['Total protein',Math.round(weekTotals.protein),'g'],['Avg protein/day',Math.round(weekTotals.protein/7),'g']].map(([label,val,unit])=>
-              React.createElement('div',{key:label,className:'card'},
-                React.createElement('div',{className:'card-title'},label),
-                React.createElement('div',{style:{display:'flex',alignItems:'baseline',gap:'4px'}},
-                  React.createElement('span',{className:'stat-big',style:{fontSize:'26px'}},val),
-                  React.createElement('span',{className:'stat-unit'},unit)
-                )
-              )
-            )
-          ),
-          React.createElement('div',{className:'card'},
-            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
-              React.createElement('div',{className:'card-title',style:{margin:0}},'✨ AI nutrition coach'),
-              React.createElement('button',{className:'save-btn',style:{fontSize:'12px',padding:'7px 13px'},onClick:getAIAdvice,disabled:adviceLoading},adviceLoading?'Analysing…':'Get advice')
-            ),
-            adviceLoading&&React.createElement('div',{className:'loading-bubble'},React.createElement('span'),React.createElement('span'),React.createElement('span')),
-            aiAdvice&&React.createElement('div',null,React.createElement('div',{className:'ai-header'},'🤖 AI Coach'),React.createElement('div',{className:'ai-advice'},aiAdvice)),
-            !aiAdvice&&!adviceLoading&&React.createElement('div',{className:'empty-state',style:{padding:'18px 0'}},React.createElement('div',null,'Click "Get advice" for a personalised weekly analysis'))
-          )
-        ),
-
-        // AI CHAT
-        view==='chat'&&React.createElement('div',{style:{display:'flex',flexDirection:'column',height:'calc(100vh - 92px)'}},
-          React.createElement('h1',{className:'section-title'},'Ask GRAMS'),
-          React.createElement('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'16px',marginTop:'-14px'}},
-            'Ask anything — "Can I fit a burger in today?" • "How\'s my protein this week?" • "What should I eat for dinner to hit my goals?"'
-          ),
-          React.createElement('div',{style:{flex:1,overflowY:'auto',marginBottom:'12px',display:'flex',flexDirection:'column',gap:'8px'},className:'ai-chat-wrap'},
-            aiChat.length===0&&React.createElement('div',{className:'empty-state'},
-              React.createElement('div',{className:'empty-icon'},'🤖'),
-              React.createElement('div',null,'Ask me anything about your nutrition'),
-              React.createElement('div',{style:{marginTop:'10px',display:'flex',flexDirection:'column',gap:'6px'}},
-                ['"Can I have a Big Mac today?"','"Am I hitting my protein this week?"','"What can I eat for 400 kcal tonight?"','"How do I hit my body fat goal?"'].map(q=>
-                  React.createElement('button',{key:q,onClick:()=>setAiChatInput(q),style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 12px',fontSize:'12px',color:'var(--text2)',textAlign:'left',cursor:'pointer',transition:'all .15s'},onMouseEnter:e=>{e.target.style.borderColor='var(--border2)';e.target.style.color='var(--text)'},onMouseLeave:e=>{e.target.style.borderColor='var(--border)';e.target.style.color='var(--text2)'}},q)
-                )
-              )
-            ),
-            aiChat.map((m,i)=>React.createElement('div',{key:i,className:'ai-chat-msg '+m.role},m.text)),
-            aiChatLoading&&React.createElement('div',{className:'ai-chat-msg ai'},
-              React.createElement('div',{className:'loading-bubble'},React.createElement('span'),React.createElement('span'),React.createElement('span'))
-            ),
-            React.createElement('div',{ref:chatEndRef})
-          ),
-          React.createElement('div',{style:{display:'flex',gap:'8px'}},
-            React.createElement('textarea',{className:'chat-textarea',style:{flex:1},placeholder:'Ask anything about your macros and goals…',value:aiChatInput,onChange:e=>setAiChatInput(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleAiChat();}},rows:2}),
-            React.createElement('button',{className:'send-btn',onClick:handleAiChat,disabled:aiChatLoading||!aiChatInput.trim()},aiChatLoading?'…':'↑')
-          )
-        ),
-
-        // GOALS
-        view==='goals'&&React.createElement('div',null,
-          React.createElement('h1',{className:'section-title'},'Goals & profile'),
-          React.createElement('div',{className:'card',style:{marginBottom:'14px'}},
-            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
-              React.createElement('div',{className:'card-title',style:{margin:0}},'Body stats'),
-              React.createElement('div',{style:{display:'flex',gap:'2px',background:'var(--surface3)',padding:'3px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)'}},
-                ['kg','lbs'].map(u=>React.createElement('button',{key:u,onClick:()=>setWeightUnit(u),style:{padding:'3px 10px',borderRadius:'5px',fontSize:'11px',fontWeight:600,border:'none',cursor:'pointer',background:weightUnit===u?'var(--accent)':'transparent',color:weightUnit===u?'#0a0a08':'var(--text3)',transition:'all .15s'}},u))
-              )
-            ),
-            React.createElement('div',{className:'grid-2',style:{gap:'10px'}},
-              [['weight','Current weight'],['target_weight','Target weight'],['body_fat','Body fat (%)'],['target_body_fat','Target body fat (%)']].map(([k,label])=>{
-                const isWeight=k==='weight'||k==='target_weight';
-                const displayVal=isWeight?toDisplay(goals[k]):goals[k];
-                return React.createElement('div',{key:k,className:'goal-row'},
-                  React.createElement('label',null,label+(isWeight?' ('+unitLabel+')':' (%)')),
-                  React.createElement('input',{type:'number',placeholder:String(displayVal),value:goalInput[k]!==undefined?goalInput[k]:'',onChange:e=>setGoalInput(p=>({...p,[k]:e.target.value}))})
-                );
-              })
-            )
-          ),
-          React.createElement('div',{className:'card',style:{marginBottom:'14px'}},
-            React.createElement('div',{className:'card-title'},'Daily macro targets'),
-            React.createElement('div',{className:'grid-2',style:{gap:'10px'}},
-              [['calories','Calories (kcal)',goals.calories],['protein','Protein (g)',goals.protein],['carbs','Carbohydrates (g)',goals.carbs],['fat','Fat (g)',goals.fat]].map(([k,label,val])=>
-                React.createElement('div',{key:k,className:'goal-row'},React.createElement('label',null,label),React.createElement('input',{type:'number',placeholder:String(val),value:goalInput[k]!==undefined?goalInput[k]:'',onChange:e=>setGoalInput(p=>({...p,[k]:e.target.value}))}))
-              )
-            ),
-            React.createElement('div',{style:{marginTop:'14px'}},React.createElement('button',{className:'save-btn',onClick:saveGoals},'Save goals'))
-          ),
-          React.createElement('div',{className:'card'},
-            React.createElement('div',{className:'card-title'},'Active goals'),
-            React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:'8px'}},
-              [['⚡',goals.calories+' kcal/day','#ff6b1a'],['🥩',goals.protein+'g protein','#ff6b1a'],['🌾',goals.carbs+'g carbs','#f0b429'],['🥑',goals.fat+'g fat','#e08c3a'],['⚖️',toDisplay(goals.weight)+'→'+toDisplay(goals.target_weight)+unitLabel,'var(--text2)'],['💪',goals.body_fat+'%→'+goals.target_body_fat+'% BF','var(--text2)']].map(([icon,label,color])=>
-                React.createElement('div',{key:label,style:{display:'flex',alignItems:'center',gap:'5px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'8px',padding:'7px 11px',fontSize:'12px',color}},icon,' ',label)
-              )
-            )
-          )
-        ),
-
-        // HISTORY
-        view==='history'&&React.createElement('div',null,
-          React.createElement('h1',{className:'section-title'},'Food history'),
-          allEntries.length===0
-            ?React.createElement('div',{className:'card'},React.createElement('div',{className:'empty-state'},React.createElement('div',{className:'empty-icon'},'📋'),'No history yet'))
-            :allEntries.map(([date,dayEntries])=>{
-              const t=dayEntries.reduce((a,e)=>({cal:a.cal+(e.calories||0),p:a.p+(e.protein||0),c:a.c+(e.carbs||0),f:a.f+(e.fat||0)}),{cal:0,p:0,c:0,f:0});
-              const d=new Date(date+'T12:00:00');
-              const label=date===today?'Today':d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
-              return React.createElement('div',{key:date,className:'card',style:{marginBottom:'10px'}},
-                React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
-                  React.createElement('div',{style:{fontSize:'14px',fontWeight:500}},label),
-                  React.createElement('div',{style:{display:'flex',gap:'6px'}},
-                    React.createElement('span',{className:'mp cal'},Math.round(t.cal)+' kcal'),
-                    React.createElement('span',{className:'mp p'},'P '+Math.round(t.p)+'g'),
-                    React.createElement('span',{className:'mp c'},'C '+Math.round(t.c)+'g'),
-                    React.createElement('span',{className:'mp f'},'F '+Math.round(t.f)+'g')
-                  )
-                ),
-                dayEntries.filter(e=>!e.isError).map(entry=>
-                  React.createElement('div',{key:entry.id},
-                    React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0',borderTop:'1px solid var(--border)',fontSize:'13px'}},
-                      React.createElement('div',{style:{flex:1,minWidth:0}},
-                        editingEntry&&editingEntry.id===entry.id
-                          ? React.createElement('div',{style:{display:'flex',gap:'5px',alignItems:'center'}},
-                              React.createElement('input',{
-                                autoFocus:true,
-                                value:editingEntry.value,
-                                onChange:e=>setEditingEntry(prev=>({...prev,value:e.target.value})),
-                                onKeyDown:e=>{
-                                  if(e.key==='Enter')updateEntryName(date,entry.id,editingEntry.value);
-                                  if(e.key==='Escape')setEditingEntry(null);
-                                },
-                                onBlur:()=>updateEntryName(date,entry.id,editingEntry.value),
-                                style:{flex:1,background:'var(--surface3)',border:'1px solid var(--accent)',borderRadius:'4px',padding:'3px 7px',color:'var(--text)',fontSize:'13px',outline:'none'}
-                              }),
-                              React.createElement('span',{style:{fontSize:'10px',color:'var(--text3)',cursor:'pointer'},onClick:()=>setEditingEntry(null)},'✕')
-                            )
-                          : React.createElement('div',{style:{display:'flex',alignItems:'center',gap:'5px',cursor:'pointer'},title:'Click to rename',onClick:()=>setEditingEntry({id:entry.id,date,value:entry.name})},
-                              React.createElement('span',{style:{color:'var(--text)',fontWeight:500}},entry.name),
-                              React.createElement('span',{style:{fontSize:'9px',color:'var(--text3)',background:'var(--surface3)',padding:'1px 4px',borderRadius:'3px',flexShrink:0}},'rename')
-                            ),
-                        entry.description&&React.createElement('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'2px',fontStyle:'italic'}},entry.description)
-                      ),
-                      React.createElement('div',{style:{display:'flex',gap:'7px',alignItems:'center',flexShrink:0,marginLeft:'8px'}},
-                        React.createElement('span',{style:{color:'var(--text2)',fontSize:'12px'}},entry.calories+' kcal'),
-                        React.createElement('button',{onClick:()=>deleteEntry(date,entry.id),style:{fontSize:'11px',color:'var(--text3)',cursor:'pointer'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
-                      )
-                    ),
-                    React.createElement('div',{style:{display:'flex',gap:'5px',marginTop:'5px',flexWrap:'wrap'}},
-                      [['calories','kcal','cal'],['protein','g','p'],['carbs','g','c'],['fat','g','f'],['fiber','g','fi']].map(([field,unit,cls])=>
-                        editingMacro&&editingMacro.id===entry.id&&editingMacro.field===field
-                          ? React.createElement('div',{key:field,style:{display:'flex',alignItems:'center',gap:'3px'}},
-                              React.createElement('input',{autoFocus:true,type:'number',value:editingMacro.value,onChange:e=>setEditingMacro(p=>({...p,value:e.target.value})),onKeyDown:e=>{if(e.key==='Enter')updateEntryMacro(date,entry.id,field,editingMacro.value);if(e.key==='Escape')setEditingMacro(null);},onBlur:()=>updateEntryMacro(date,entry.id,field,editingMacro.value),style:{width:'60px',background:'var(--surface3)',border:'1px solid var(--accent)',borderRadius:'4px',padding:'2px 5px',color:'var(--text)',fontSize:'11px',outline:'none'}})
-                            )
-                          : React.createElement('span',{key:field,className:'mp '+cls,title:'Click to edit',style:{cursor:'pointer'},onClick:()=>setEditingMacro({id:entry.id,date,field,value:String(entry[field]||0)})},
-                              field==='calories'?(entry.calories||0)+' kcal':(field==='protein'?'P ':(field==='carbs'?'C ':(field==='fat'?'F ':'Fi ')))+(entry[field]||0)+'g'
-                            )
-                      )
-                    ),
-                    settings.showMealBars&&React.createElement(MealBar,{entry,expanded:false,onToggle:()=>{}})
-                  )
-                )
-              );
-            })
-        ),
-
-        // ADVICE HISTORY
-        view==='advice'&&React.createElement('div',null,
-          React.createElement('h1',{className:'section-title'},'AI advice history'),
-          adviceHistory.length===0
-            ?React.createElement('div',{className:'card'},React.createElement('div',{className:'empty-state'},React.createElement('div',{className:'empty-icon'},'🤖'),'No advice yet — go to Week and click "Get advice"'))
-            :adviceHistory.map(a=>React.createElement('div',{key:a.id,className:'advice-history-item'},
-                React.createElement('div',{className:'advice-history-date'},new Date(a.created_at).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
-                React.createElement('div',{className:'advice-history-text'},a.advice)
-              ))
-        ),
-
-        // SETTINGS
-        view==='settings'&&React.createElement('div',null,
-          React.createElement('h1',{className:'section-title'},'Settings'),
-          React.createElement('div',{className:'card',style:{marginBottom:'14px'}},
-            React.createElement('div',{className:'settings-label'},'Nutrition tracking'),
-            React.createElement('div',{className:'toggle-row'},
-              React.createElement('div',null,
-                React.createElement('div',{className:'toggle-label'},'Advanced mode'),
-                React.createElement('div',{className:'toggle-desc'},'Track micronutrients (vitamins, minerals)')
-              ),
-              React.createElement('div',{className:'toggle'+(settings.advancedMode?' on':''),onClick:()=>updateSetting('advancedMode',!settings.advancedMode)})
-            ),
-            React.createElement('div',{className:'toggle-row'},
-              React.createElement('div',null,
-                React.createElement('div',{className:'toggle-label'},'Meal macro bars'),
-                React.createElement('div',{className:'toggle-desc'},'Show coloured macro bar on each log entry')
-              ),
-              React.createElement('div',{className:'toggle'+(settings.showMealBars?' on':''),onClick:()=>updateSetting('showMealBars',!settings.showMealBars)})
-            )
-          ),
-          React.createElement('div',{className:'card'},
-            React.createElement('div',{className:'settings-label'},'AI estimate preference'),
-            React.createElement('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'12px'}},'When AI estimates food macros, which value should be used?'),
-            ['ask','under','avg','over'].map(opt=>
-              React.createElement('div',{key:opt,className:'toggle-row',style:{cursor:'pointer',marginBottom:'5px'},onClick:()=>updateSetting('estimateMode',opt)},
-                React.createElement('div',null,
-                  React.createElement('div',{className:'toggle-label'},opt==='ask'?'Ask me each time':opt==='under'?'Always use lower estimate':opt==='avg'?'Always use average estimate':'Always use higher estimate'),
-                  React.createElement('div',{className:'toggle-desc'},opt==='ask'?'A popup will ask you after each AI lookup':opt==='under'?'Good for cutting / weight loss':opt==='avg'?'Balanced and accurate':' Good for bulking / gaining')
-                ),
-                React.createElement('div',{style:{width:'16px',height:'16px',borderRadius:'50%',border:'2px solid '+(settings.estimateMode===opt?'var(--accent)':'var(--border2)'),background:settings.estimateMode===opt?'var(--accent)':'transparent',flexShrink:0,transition:'all .15s'}})
-              )
-            )
-          )
+    // Mobile bottom nav
+    e('nav',{className:'mobile-nav'},
+      [{id:'today',icon:'🍽',label:'Today'},{id:'week',icon:'📊',label:'Week'},{id:'chat',icon:'💬',label:'Chat'},{id:'goals',icon:'🎯',label:'Goals'},{id:'settings',icon:'⚙️',label:'More'}].map(t=>
+        e('button',{key:t.id,className:'mnav-btn'+(view===t.id?' active':''),onClick:()=>setView(t.id)},
+          e('span',{className:'mnav-icon'},t.icon),
+          t.label
         )
       )
     )
   );
+}
 
-  // mobile nav inline below
-
-// ── Root ───────────────────────────────────────────────────────
+// ─── Root ─────────────────────────────────────────────────────
 function Root() {
+  const e=React.createElement;
   const [user,setUser]=useState(null);
   const [checking,setChecking]=useState(true);
+
   useEffect(()=>{
     sb.auth.getSession().then(({data})=>{setUser(data.session?.user||null);setChecking(false);});
-    const {data:listener}=sb.auth.onAuthStateChange((_e,session)=>{setUser(session?.user||null);});
-    return()=>listener.subscription.unsubscribe();
+    const {data:l}=sb.auth.onAuthStateChange((_,session)=>setUser(session?.user||null));
+    return()=>l.subscription.unsubscribe();
   },[]);
 
-  if(checking)return React.createElement('div',{style:{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px',background:'#0a0a08'}},
-    React.createElement('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'28px',color:'#ff6b1a'}},'GRAMS'),
-    React.createElement('div',{style:{width:'18px',height:'18px',border:'2px solid #302e1e',borderTopColor:'#ff6b1a',borderRadius:'50%',animation:'spin .7s linear infinite'}})
+  if(checking)return e('div',{style:{height:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'14px',background:'#0a0a08'}},
+    e('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'28px',color:'#ff6b1a'}},'GRAMS'),
+    e('div',{style:{width:'18px',height:'18px',border:'2px solid #302e1e',borderTopColor:'#ff6b1a',borderRadius:'50%',animation:'spin .7s linear infinite'}})
   );
-  if(!user)return React.createElement(AuthScreen,{onAuth:setUser});
-  return React.createElement(App,{user,onLogout:async()=>{await sb.auth.signOut();setUser(null);}});
+  if(!user)return e(AuthScreen,{onAuth:setUser});
+  return e(App,{user,onLogout:async()=>{await sb.auth.signOut();setUser(null);}});
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Root));
