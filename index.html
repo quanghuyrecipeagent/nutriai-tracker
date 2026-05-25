@@ -432,19 +432,23 @@ For restaurant/branded items use web search. Always return numbers, never null.`
 
     try {
       const raw   = await callClaude([{ role:'user', content:msg }], system);
+      console.log('Raw API response:', raw);
       const clean = raw.replace(/```json|```/g,'').trim();
-      const s = clean.indexOf('{'), e = clean.lastIndexOf('}');
-      const food  = JSON.parse(clean.slice(s, e+1));
+      const s = clean.indexOf('{'), e2 = clean.lastIndexOf('}');
+      if (s === -1 || e2 === -1) throw new Error('No JSON found. Raw: ' + raw.slice(0,300));
+      const food  = JSON.parse(clean.slice(s, e2+1));
       const today = getToday();
       const row   = { user_id:user.id, name:food.name||msg, calories:Math.round(food.calories||0), protein:Math.round(food.protein||0), carbs:Math.round(food.carbs||0), fat:Math.round(food.fat||0), fiber:Math.round(food.fiber||0), micros:food.micros||{}, eaten_date:today, eaten_at:new Date().toISOString() };
-      const { data: inserted } = await sb.from('food_entries').insert(row).select().single();
+      const { data: inserted, error: dbErr } = await sb.from('food_entries').insert(row).select().single();
+      if (dbErr) throw new Error('DB: ' + dbErr.message);
       if (inserted) {
         const display = { ...inserted, time:new Date(inserted.eaten_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) };
         setEntries(prev => ({ ...prev, [today]:[...(prev[today]||[]), display] }));
       }
-    } catch {
+    } catch(err) {
+      console.error('GRAMS handleSend error:', err);
       const today = getToday();
-      setEntries(prev => ({ ...prev, [today]:[...(prev[today]||[]), { id:Date.now(), isError:true, name:"⚠ Couldn't identify that food. Try being more specific.", time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) }] }));
+      setEntries(prev => ({ ...prev, [today]:[...(prev[today]||[]), { id:Date.now(), isError:true, name:'⚠ Error: ' + (err.message||'Unknown'), time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) }] }));
     }
     setLoading(false);
   }

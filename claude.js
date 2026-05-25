@@ -17,14 +17,18 @@ export default async function handler(req) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'API key not configured' }), {
+    return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not set in Vercel environment variables' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
 
   try {
     const body = await req.json();
+
+    // Remove tools from body — send without web search to keep it simple & reliable
+    // Web search adds latency and the model knows nutrition data well
+    const { tools, ...bodyWithoutTools } = body;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -32,9 +36,8 @@ export default async function handler(req) {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'web-search-2025-03-05',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(bodyWithoutTools),
     });
 
     const data = await response.json();
