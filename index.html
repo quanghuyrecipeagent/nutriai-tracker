@@ -428,7 +428,7 @@ function App({user,onLogout}) {
   useEffect(()=>{chatEndRef.current?.scrollIntoView({behavior:'smooth'});},[aiChat,aiChatLoading]);
 
   async function callClaude(messages,system){
-    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20251001',max_tokens:1000,system,messages})});
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:1000,system,messages})});
     if(!res.ok){const t=await res.text();throw new Error('API '+res.status+': '+t.slice(0,100));}
     const data=await res.json();
     if(data.error)throw new Error(data.error.message||JSON.stringify(data.error));
