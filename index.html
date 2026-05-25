@@ -394,6 +394,7 @@ function App({user,onLogout}) {
   const [aiChat,setAiChat]=useState([]); // [{role,text}]
   const [aiChatInput,setAiChatInput]=useState('');
   const [aiChatLoading,setAiChatLoading]=useState(false);
+  const [mealName,setMealName]=useState('');
   const logEndRef=useRef(null);
   const chatEndRef=useRef(null);
 
@@ -483,7 +484,9 @@ All values must be numbers. Never return null.`;
         setPendingFood(food);
       } else {
         const choice=settings.estimateMode==='under'?food.under:settings.estimateMode==='over'?food.over:food.avg;
-        await saveEntry({name:food.name,...choice,micros:food.micros});
+        const finalName=mealName.trim()||food.name;
+        await saveEntry({name:finalName,...choice,micros:food.micros});
+        setMealName('');
       }
     } catch(err){
       console.error('handleSend error:',err);
@@ -496,10 +499,12 @@ All values must be numbers. Never return null.`;
   async function handleEstimateChoice(choice){
     if(!pendingFood)return;
     const vals=pendingFood[choice];
-    await saveEntry({name:pendingFood.name,...vals,micros:pendingFood.micros||{}}).catch(err=>{
+    const finalName=mealName.trim()||pendingFood.name;
+    await saveEntry({name:finalName,...vals,micros:pendingFood.micros||{}}).catch(err=>{
       console.error(err);
     });
     setPendingFood(null);
+    setMealName('');
   }
 
   function handleManualAdd(){
@@ -644,7 +649,8 @@ User's data:
 
           inputMode==='ai'
             ? React.createElement('div',null,
-                React.createElement('div',{className:'chat-wrap'},
+                React.createElement('input',{type:'text',placeholder:'Meal name (optional — e.g. "Breakfast", "Post-workout")',value:mealName,onChange:e=>setMealName(e.target.value),style:{width:'100%',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'12px',outline:'none',marginBottom:'7px',transition:'border-color .15s'},onFocus:e=>e.target.style.borderColor='var(--accent)',onBlur:e=>e.target.style.borderColor='var(--border)'}),
+              React.createElement('div',{className:'chat-wrap'},
                   React.createElement('textarea',{className:'chat-textarea',placeholder:'e.g. "2 eggs in butter" or "McDonald\'s Meal 2" or "i had a big mac"',value:input,onChange:e=>setInput(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}},rows:2}),
                   React.createElement('button',{className:'send-btn',onClick:handleSend,disabled:loading||!input.trim()},loading?'…':'↑')
                 ),
