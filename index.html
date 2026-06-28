@@ -378,8 +378,71 @@ function MealBarViz({entry,expanded,onToggle}) {
   );
 }
 
-// ── Library Overlay ───────────────────────────────────────────
-// mode: 'log' (one-tap log), 'add' (add to AI prompt as base)
+// ── Edit Meal Overlay ─────────────────────────────────────────
+function EditMealOverlay({entry,advancedMode,onSave,onDelete,onClose}) {
+  const [form,setForm]=useState({
+    name:entry.name||'',
+    description:entry.description||'',
+    calories:String(entry.calories||0),
+    protein:String(entry.protein||0),
+    carbs:String(entry.carbs||0),
+    fat:String(entry.fat||0),
+    fiber:String(entry.fiber||0),
+    micros:{...(entry.micros||{})}
+  });
+  function setField(k,v){setForm(p=>({...p,[k]:v}));}
+  function setMicro(k,v){setForm(p=>({...p,micros:{...p.micros,[k]:v}}));}
+  function save(){
+    onSave({
+      name:form.name.trim()||'Untitled meal',
+      description:form.description.trim(),
+      calories:Math.round(parseFloat(form.calories)||0),
+      protein:Math.round(parseFloat(form.protein)||0),
+      carbs:Math.round(parseFloat(form.carbs)||0),
+      fat:Math.round(parseFloat(form.fat)||0),
+      fiber:Math.round(parseFloat(form.fiber)||0),
+      micros:Object.fromEntries(Object.entries(form.micros).map(([k,v])=>[k,Math.round(parseFloat(v)||0)]))
+    });
+  }
+  return h('div',{className:'ov',onClick:onClose},
+    h('div',{className:'ovbox',onClick:e=>e.stopPropagation()},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
+        h('div',{className:'ovtitle'},'Edit meal'),
+        h('button',{className:'ovcl',onClick:onClose},'✕')
+      ),
+      h('div',{style:{overflowY:'auto',flex:1}},
+        h('div',{className:'mf',style:{marginBottom:'9px'}},
+          h('label',null,'Name'),
+          h('input',{type:'text',value:form.name,onChange:e=>setField('name',e.target.value),style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'8px 11px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}})
+        ),
+        h('div',{className:'mf',style:{marginBottom:'12px'}},
+          h('label',null,'Description / ingredients (optional)'),
+          h('input',{type:'text',value:form.description,onChange:e=>setField('description',e.target.value),placeholder:'e.g. 2 eggs fried in butter',style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'8px 11px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}})
+        ),
+        h('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:'7px'}},'Macros'),
+        h('div',{className:'ov-grid',style:{marginBottom:advancedMode?'14px':'4px'}},
+          [['calories','Calories (kcal)'],['protein','Protein (g)'],['carbs','Carbs (g)'],['fat','Fat (g)'],['fiber','Fiber (g)']].map(([k,lbl])=>
+            h('div',{key:k,className:'mf'},h('label',null,lbl),h('input',{type:'number',value:form[k],onChange:e=>setField(k,e.target.value)}))
+          )
+        ),
+        advancedMode&&h('div',null,
+          h('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:'7px'}},'Micronutrients'),
+          h('div',{className:'ov-grid'},
+            Object.keys(MICRO_GOALS).map(k=>
+              h('div',{key:k,className:'mf'},h('label',null,MICRO_GOALS[k].label+' ('+MICRO_GOALS[k].unit+')'),h('input',{type:'number',value:form.micros[k]!==undefined?form.micros[k]:0,onChange:e=>setMicro(k,e.target.value)}))
+            )
+          )
+        )
+      ),
+      h('div',{style:{display:'flex',gap:'8px',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)'}},
+        h('button',{className:'cbtn-no',style:{flex:1},onClick:onDelete},'Delete meal'),
+        h('button',{className:'savebtn',style:{flex:2},onClick:save},'Save changes')
+      )
+    )
+  );
+}
+
+
 function LibraryOverlay({savedFoods,onLog,onAddToPrompt,onDelete,onClose,mode}) {
   const [search,setSearch]=useState('');
   const [portions,setPortions]=useState({});
@@ -456,6 +519,7 @@ function App({user,onLogout}) {
   const [manual,setManual]=useState({name:'',calories:'',protein:'',carbs:'',fat:'',fiber:''});
   const [saveToLib,setSaveToLib]=useState(false); // checkbox to save manual/AI entry to library
   const [photoPreview,setPhotoPreview]=useState(null); // {dataUrl, mediaType}
+  const [editingMeal,setEditingMeal]=useState(null); // {entry, date}
   const fileInputRef=useRef(null);
   // UI state
   const [loading,setLoading]=useState(false);
@@ -690,6 +754,15 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,[field]:num}:x)}));
     setEditMacro(null);
   }
+  async function updateFullMeal(date,id,updates){
+    await sb.from('food_entries').update({...updates,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
+    setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,...updates}:x)}));
+    setEditingMeal(null);
+  }
+  async function deleteAndCloseEdit(date,id){
+    await deleteEntry(date,id);
+    setEditingMeal(null);
+  }
   async function clearAll(){
     await sb.from('food_entries').delete().eq('user_id',user.id);
     await sb.from('ai_advice').delete().eq('user_id',user.id);
@@ -823,15 +896,20 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
       // Log
       h('div',{className:'log'},
         todayEntries.length===0&&h('div',{className:'empty'},h('div',{className:'eico'},'🍽️'),h('div',null,'Nothing logged today'),h('div',{style:{marginTop:'4px',fontSize:'11px'}},'Use AI or manual input')),
-        todayEntries.map(entry=>h('div',{key:entry.id,className:'li'},
+        todayEntries.map(entry=>h('div',{
+          key:entry.id,
+          className:'li',
+          style:entry.isError?{}:{cursor:'pointer'},
+          onClick:entry.isError?undefined:()=>setEditingMeal({entry,date:tod})
+        },
           h('div',{className:'lh'},
             h('div',{style:{flex:1,minWidth:0}},
-              h('span',{className:'ln',style:entry.isError?{color:'var(--danger)',fontSize:'12px'}:{}},entry.name),
+              h('span',{className:'ln',style:entry.isError?{color:'var(--danger)',fontSize:'12px'}:{}},entry.name,!entry.isError&&h('span',{style:{fontSize:'10px',color:'var(--text3)',marginLeft:'5px',fontWeight:'normal'}},'✎')),
               entry.description&&h('div',{className:'ldesc'},entry.description)
             ),
             h('div',{style:{display:'flex',alignItems:'center',gap:'4px'}},
               h('span',{className:'lt'},entry.time),
-              !entry.isError&&h('button',{className:'ldel',onClick:()=>deleteEntry(tod,entry.id)},'✕')
+              !entry.isError&&h('button',{className:'ldel',onClick:e=>{e.stopPropagation();deleteEntry(tod,entry.id);}},'✕')
             )
           ),
           !entry.isError&&h('div',{className:'pills'},
@@ -841,13 +919,13 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
             h('span',{className:'mp f'},'F '+(entry.fat||0)+'g'),
             (entry.fiber||0)>0&&h('span',{className:'mp fi'},'Fi '+entry.fiber+'g')
           ),
-          !entry.isError&&settings.showMealBars&&h(MealBarViz,{entry,expanded:expandedMeals[entry.id],onToggle:()=>setExpandedMeals(p=>({...p,[entry.id]:!p[entry.id]}))}),
+          !entry.isError&&settings.showMealBars&&h(MealBarViz,{entry,expanded:expandedMeals[entry.id],onToggle:e=>{if(e&&e.stopPropagation)e.stopPropagation();setExpandedMeals(p=>({...p,[entry.id]:!p[entry.id]}));}}),
           !entry.isError&&(()=>{
             const alreadySaved=savedFoods.some(f=>f.name.toLowerCase()===entry.name.toLowerCase());
             return h('button',{
               className:'log-save-btn',
               disabled:alreadySaved,
-              onClick:()=>doSaveToLib(entry),
+              onClick:e=>{e.stopPropagation();doSaveToLib(entry);},
               style:{marginTop:'5px',fontSize:'10px',color:alreadySaved?'var(--accent)':'var(--text3)',background:'none',border:'none',cursor:alreadySaved?'default':'pointer',padding:0,display:'flex',alignItems:'center',gap:'3px'}
             },alreadySaved?'✓ saved to library':'+ save to library');
           })()
@@ -983,28 +1061,21 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
               h('span',{className:'mp f'},'F '+Math.round(t.f)+'g')
             )
           ),
-          dayEntries.filter(x=>!x.isError).map(entry=>h('div',{key:entry.id,className:'hentry'},
+          dayEntries.filter(x=>!x.isError).map(entry=>h('div',{key:entry.id,className:'hentry',style:{cursor:'pointer'},onClick:()=>setEditingMeal({entry,date})},
             h('div',{className:'hrow'},
               h('div',{style:{flex:1,minWidth:0}},
-                editName&&editName.id===entry.id
-                  ?h('div',{style:{display:'flex',gap:'5px',alignItems:'center'}},
-                      h('input',{autoFocus:true,className:'iinput',style:{flex:1},value:editName.value,onChange:e=>setEditName(p=>({...p,value:e.target.value})),onKeyDown:e=>{if(e.key==='Enter')updName(date,entry.id,editName.value);if(e.key==='Escape')setEditName(null);},onBlur:()=>updName(date,entry.id,editName.value)}),
-                      h('span',{style:{fontSize:'10px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none'},onClick:()=>setEditName(null)},'✕')
-                    )
-                  :h('div',{className:'hname',title:'Click to rename',onClick:()=>setEditName({id:entry.id,date,value:entry.name})},entry.name,' ',h('span',{style:{fontSize:'10px',color:'var(--text3)',fontWeight:'normal'}},'✎')),
+                h('div',{className:'hname'},entry.name,' ',h('span',{style:{fontSize:'10px',color:'var(--text3)',fontWeight:'normal'}},'✎')),
                 entry.description&&h('div',{className:'hdesc'},entry.description)
               ),
               h('div',{style:{display:'flex',gap:'5px',alignItems:'center',flexShrink:0,marginLeft:'7px'}},
                 h('span',{style:{color:'var(--text2)',fontSize:'12px'}},entry.calories+' kcal'),
-                h('button',{onClick:()=>deleteEntry(date,entry.id),style:{fontSize:'10px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
+                h('button',{onClick:e=>{e.stopPropagation();deleteEntry(date,entry.id);},style:{fontSize:'10px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
               )
             ),
             h('div',{className:'hpills'},
               [['calories','cal','kcal',''],['protein','p','g','P '],['carbs','c','g','C '],['fat','f','g','F '],['fiber','fi','g','Fi ']].map(([field,cls,unit,pre])=>
-                editMacro&&editMacro.id===entry.id&&editMacro.field===field
-                  ?h('input',{key:field,autoFocus:true,type:'number',className:'iinput mp',style:{width:'68px'},value:editMacro.value,onChange:e=>setEditMacro(p=>({...p,value:e.target.value})),onKeyDown:e=>{if(e.key==='Enter')updMacro(date,entry.id,field,editMacro.value);if(e.key==='Escape')setEditMacro(null);},onBlur:()=>updMacro(date,entry.id,field,editMacro.value)})
-                  :h('span',{key:field,className:'mp '+cls+' hpill',title:'Click to edit',onClick:()=>setEditMacro({id:entry.id,date,field,value:String(entry[field]||0)})},
-                      field==='calories'?(entry.calories||0)+' kcal':pre+(entry[field]||0)+'g'
+                h('span',{key:field,className:'mp '+cls},
+                  field==='calories'?(entry.calories||0)+' kcal':pre+(entry[field]||0)+'g'
                     )
               )
             )
@@ -1057,6 +1128,14 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     libMode&&h(LibraryOverlay,{savedFoods,onLog:logFromLibrary,onAddToPrompt:addToPrompt,onDelete:deleteFromLibrary,onClose:()=>setLibMode(null),mode:libMode}),
 
     // Estimate overlay
+    editingMeal&&h(EditMealOverlay,{
+      entry:editingMeal.entry,
+      advancedMode:settings.advancedMode,
+      onSave:updates=>updateFullMeal(editingMeal.date,editingMeal.entry.id,updates),
+      onDelete:()=>deleteAndCloseEdit(editingMeal.date,editingMeal.entry.id),
+      onClose:()=>setEditingMeal(null)
+    }),
+
     pendingFood&&h('div',{className:'ov'},
       h('div',{className:'ovbox'},
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},h('div',{className:'ovtitle'},'Which estimate?'),h('button',{className:'ovcl',onClick:()=>setPendingFood(null)},'✕')),
