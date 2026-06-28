@@ -513,7 +513,7 @@ function App({user,onLogout}) {
   const [inputMode,setInputMode]=useState('ai');
   const [aiText,setAiText]=useState('');
   const [mealName,setMealName]=useState('');
-  const [baseMeal,setBaseMeal]=useState(null); // {food, portion, scaledMacros}
+  const [baseMeals,setBaseMeals]=useState([]); // [{food, portion, scaledMacros}, ...]
   const [showOverride,setShowOverride]=useState(false);
   const [override,setOverride]=useState({calories:'',protein:'',carbs:'',fat:'',fiber:''});
   const [manual,setManual]=useState({name:'',calories:'',protein:'',carbs:'',fat:'',fiber:''});
@@ -631,14 +631,14 @@ function App({user,onLogout}) {
   async function handleSend(){
     const msg=aiText.trim();
     const hasPhoto=!!photoPreview;
-    if(!msg&&!hasPhoto)return;
+    if(!msg&&!hasPhoto&&baseMeals.length===0)return;
     if(loading)return;
     setAiText('');
     if(!hasPhoto&&['clear','reset','delete all','wipe','start over'].some(p=>msg.toLowerCase().includes(p))){setShowConfirm(true);return;}
     setLoading(true);
 
-    // Build system prompt — include base meal if set
-    const baseInfo=baseMeal?`\n\nThe user already has a base meal: "${baseMeal.food.name}" (×${baseMeal.portion} portions). They are describing or showing ADDITIONAL items to add on top of it. Only estimate macros for the NEW additional items — do NOT include the base meal's macros, they are added separately by the app.`:'';
+    // Build system prompt — include base meals if set
+    const baseInfo=baseMeals.length>0?`\n\nThe user already has ${baseMeals.length} base meal(s) tracked: ${baseMeals.map(b=>`"${b.food.name}" (×${b.portion})`).join(', ')}. They are describing or showing ADDITIONAL items to add on top of these. Only estimate macros for the NEW additional items — do NOT include the base meals' macros, they are added separately by the app.`:'';
     const photoInfo=hasPhoto?`\n\nThe user has attached a photo of their food. Identify the food(s) in the image and estimate portion sizes visually. If they also wrote text, use it as additional context (e.g. clarifying ingredients, brand, or amount).`:'';
 
     const sys=`You are a precise nutrition AI. Return ONLY valid JSON, no markdown, no text outside the JSON.${baseInfo}${photoInfo}
@@ -662,26 +662,37 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
       userContent=msg;
     }
 
-    try{
-      const raw=await callClaude([{role:'user',content:userContent}],sys);
-      const s=raw.indexOf('{'),en=raw.lastIndexOf('}');
-      if(s===-1)throw new Error('No JSON: '+raw.slice(0,120));
-      const food=JSON.parse(raw.slice(s,en+1));
-      food.micros=food.micros||{};
-      const applyOv=vals=>{const out={...vals};Object.keys(override).forEach(k=>{if(override[k]!=='')out[k]=parseFloat(override[k])||0;});return out;};
-      food.avg=applyOv(food.avg);food.under=applyOv(food.under);food.over=applyOv(food.over);
+    // If there are base meals but no extra text/photo, skip the AI call entirely
+    const onlyBaseMeals=baseMeals.length>0&&!msg&&!hasPhoto;
 
-      // If there's a base meal, COMBINE its macros into the food estimate (single entry, not two)
-      if(baseMeal){
-        const bm=baseMeal.scaledMacros;
-        const addBase=vals=>({calories:(vals.calories||0)+(bm.calories||0),protein:(vals.protein||0)+(bm.protein||0),carbs:(vals.carbs||0)+(bm.carbs||0),fat:(vals.fat||0)+(bm.fat||0),fiber:(vals.fiber||0)+(bm.fiber||0)});
+    try{
+      let food;
+      if(onlyBaseMeals){
+        // No extras — just combine the base meals into one entry
+        food={name:'',avg:{calories:0,protein:0,carbs:0,fat:0,fiber:0},under:{calories:0,protein:0,carbs:0,fat:0,fiber:0},over:{calories:0,protein:0,carbs:0,fat:0,fiber:0},micros:{}};
+      } else {
+        const raw=await callClaude([{role:'user',content:userContent}],sys);
+        const s=raw.indexOf('{'),en=raw.lastIndexOf('}');
+        if(s===-1)throw new Error('No JSON: '+raw.slice(0,120));
+        food=JSON.parse(raw.slice(s,en+1));
+        food.micros=food.micros||{};
+        const applyOv=vals=>{const out={...vals};Object.keys(override).forEach(k=>{if(override[k]!=='')out[k]=parseFloat(override[k])||0;});return out;};
+        food.avg=applyOv(food.avg);food.under=applyOv(food.under);food.over=applyOv(food.over);
+      }
+
+      // Combine ALL base meals' macros into the food estimate (single entry, not separate)
+      if(baseMeals.length>0){
+        const addBase=vals=>baseMeals.reduce((acc,bm)=>({calories:acc.calories+(bm.scaledMacros.calories||0),protein:acc.protein+(bm.scaledMacros.protein||0),carbs:acc.carbs+(bm.scaledMacros.carbs||0),fat:acc.fat+(bm.scaledMacros.fat||0),fiber:acc.fiber+(bm.scaledMacros.fiber||0)}),{...vals});
         food.avg=addBase(food.avg);food.under=addBase(food.under);food.over=addBase(food.over);
-        // Merge micros too
-        const baseMicros=baseMeal.food.micros||{};
-        Object.keys(baseMicros).forEach(k=>{food.micros[k]=(food.micros[k]||0)+(baseMicros[k]||0)*baseMeal.portion;});
-        // Combine the name: "Ground beef + rice and potato"
-        food.name=baseMeal.food.name+' + '+food.name;
-        food.baseMealLogged=true; // flag so we clear baseMeal after saving
+        // Merge micros from all base meals
+        baseMeals.forEach(bm=>{
+          const bMicros=bm.food.micros||{};
+          Object.keys(bMicros).forEach(k=>{food.micros[k]=(food.micros[k]||0)+(bMicros[k]||0)*bm.portion;});
+        });
+        // Combine names: "Ground beef + rice + extra item"
+        const baseNames=baseMeals.map(b=>b.food.name+(b.portion!==1?' (×'+b.portion+')':'')).join(' + ');
+        food.name=food.name?baseNames+' + '+food.name:baseNames;
+        food.baseMealLogged=true; // flag so we clear baseMeals after saving
       }
 
       if(settings.estimateMode==='ask'){
@@ -691,7 +702,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
         const finalName=mealName.trim()||food.name;
         const desc=mealName.trim()?food.name:'';
         await saveEntry({name:finalName,description:desc,...choice,micros:food.micros,autoSaveLib:saveToLib});
-        if(food.baseMealLogged)setBaseMeal(null);
+        if(food.baseMealLogged)setBaseMeals([]);
         setMealName('');setOverride({calories:'',protein:'',carbs:'',fat:'',fiber:''});setSaveToLib(false);setPhotoPreview(null);
       }
     } catch(err){
@@ -707,7 +718,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     const finalName=mealName.trim()||pendingFood.name;
     const desc=mealName.trim()?pendingFood.name:'';
     try{await saveEntry({name:finalName,description:desc,...vals,micros:pendingFood.micros||{},autoSaveLib:saveToLib});}catch(err){console.error(err);}
-    if(pendingFood.baseMealLogged)setBaseMeal(null);
+    if(pendingFood.baseMealLogged)setBaseMeals([]);
     setPendingFood(null);setMealName('');setOverride({calories:'',protein:'',carbs:'',fat:'',fiber:''});setSaveToLib(false);setPhotoPreview(null);
   }
 
@@ -726,10 +737,23 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   }
 
   function addToPrompt(food,portion,scaledMacros){
-    setBaseMeal({food,portion,scaledMacros});
+    setBaseMeals(prev=>{
+      // If this food is already in the list, update its portion instead of duplicating
+      const existing=prev.findIndex(b=>b.food.id===food.id);
+      if(existing!==-1){
+        const next=[...prev];
+        next[existing]={food,portion,scaledMacros};
+        return next;
+      }
+      return [...prev,{food,portion,scaledMacros}];
+    });
     setInputMode('ai');
     setLibMode(null);
     setView('today');
+  }
+
+  function removeBaseMeal(idx){
+    setBaseMeals(prev=>prev.filter((_,i)=>i!==idx));
   }
 
   async function deleteFromLibrary(id){
@@ -842,13 +866,16 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
         ),
 
         inputMode==='ai'?h('div',null,
-          // Base meal indicator
-          baseMeal&&h('div',{style:{background:'rgba(255,107,26,.1)',border:'1px solid rgba(255,107,26,.3)',borderRadius:'var(--radius-sm)',padding:'6px 9px',marginBottom:'7px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
-            h('div',null,
-              h('div',{style:{fontSize:'11px',color:'var(--accent)',fontWeight:600}},'Base: '+baseMeal.food.name+' (×'+baseMeal.portion+')'),
-              h('div',{style:{fontSize:'10px',color:'var(--text3)'}},'+ '+baseMeal.scaledMacros.calories+' kcal · Add extras below')
-            ),
-            h('button',{onClick:()=>setBaseMeal(null),style:{fontSize:'12px',color:'var(--text3)',border:'none',background:'none',cursor:'pointer'}},'✕')
+          // Base meals indicator — supports multiple stacked meals
+          baseMeals.length>0&&h('div',{style:{marginBottom:'7px'}},
+            baseMeals.map((bm,idx)=>h('div',{key:idx,style:{background:'rgba(255,107,26,.1)',border:'1px solid rgba(255,107,26,.3)',borderRadius:'var(--radius-sm)',padding:'6px 9px',marginBottom:'4px',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+              h('div',null,
+                h('div',{style:{fontSize:'11px',color:'var(--accent)',fontWeight:600}},bm.food.name+' (×'+bm.portion+')'),
+                h('div',{style:{fontSize:'10px',color:'var(--text3)'}},bm.scaledMacros.calories+' kcal')
+              ),
+              h('button',{onClick:()=>removeBaseMeal(idx),style:{fontSize:'12px',color:'var(--text3)',border:'none',background:'none',cursor:'pointer'}},'✕')
+            )),
+            h('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'2px'}},'Total: '+baseMeals.reduce((s,b)=>s+b.scaledMacros.calories,0)+' kcal from '+baseMeals.length+' meal'+(baseMeals.length>1?'s':'')+' · add extras below')
           ),
           h('input',{className:'sinput mb',type:'text',placeholder:'Meal name (optional)',value:mealName,onChange:e=>setMealName(e.target.value)}),
           photoPreview&&h('div',{style:{position:'relative',marginBottom:'7px',borderRadius:'var(--radius-sm)',overflow:'hidden',border:'1px solid var(--border)'}},
@@ -858,12 +885,12 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
           h('input',{type:'file',accept:'image/*',capture:'environment',ref:fileInputRef,onChange:handlePhotoSelect,style:{display:'none'}}),
           h('div',{className:'crow'},
             h('button',{className:'sbtn',style:{background:'var(--surface2)',color:photoPreview?'var(--accent)':'var(--text2)',border:'1px solid '+(photoPreview?'rgba(255,107,26,.4)':'var(--border)')},onClick:()=>fileInputRef.current&&fileInputRef.current.click(),title:'Take or upload a photo'},'📷'),
-            h('textarea',{className:'cta',placeholder:photoPreview?'Add details (optional) — e.g. "with extra cheese"':baseMeal?'Add extras to your base meal (e.g. "with honey and cottage cheese")…':'e.g. "2 eggs in butter" or "McDonald\'s Meal 2"',value:aiText,onChange:e=>setAiText(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}},rows:2}),
-            h('button',{className:'sbtn',onClick:handleSend,disabled:loading||(!aiText.trim()&&!photoPreview)},loading?'…':'↑')
+            h('textarea',{className:'cta',placeholder:photoPreview?'Add details (optional) — e.g. "with extra cheese"':baseMeals.length>0?'Add extras on top (e.g. "with honey and cottage cheese") or leave blank to just log the base meals':'e.g. "2 eggs in butter" or "McDonald\'s Meal 2"',value:aiText,onChange:e=>setAiText(e.target.value),onKeyDown:e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}},rows:2}),
+            h('button',{className:'sbtn',onClick:handleSend,disabled:loading||(!aiText.trim()&&!photoPreview&&baseMeals.length===0)},loading?'…':'↑')
           ),
           h('div',{className:'row-btns'},
             h('button',{className:'rbtn'+(showOverride?' on':''),onClick:()=>setShowOverride(p=>!p)},'⚙ Override'),
-            h('button',{className:'rbtn',onClick:()=>setLibMode('add')},'+ Base meal'),
+            h('button',{className:'rbtn',onClick:()=>setLibMode('add')},baseMeals.length>0?'+ Add another base meal':'+ Base meal'),
             h('label',{style:{display:'flex',alignItems:'center',gap:'4px',fontSize:'11px',color:saveToLib?'var(--accent)':'var(--text3)',cursor:'pointer'}},
               h('input',{type:'checkbox',checked:saveToLib,onChange:e=>setSaveToLib(e.target.checked),style:{accentColor:'var(--accent)'}}),
               'Save to library'
@@ -877,7 +904,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
               )
             )
           ),
-          h('p',{className:'hint'},baseMeal?'Prompt will add extras on top of your base meal macros':'Tap 📷 for a photo, or type — restaurant meals, recipes, anything')
+          h('p',{className:'hint'},baseMeals.length>0?'Extras will be added on top of your base meal totals':'Tap 📷 for a photo, or type — restaurant meals, recipes, anything')
         ):h('div',null,
           h('div',{className:'mf',style:{marginBottom:'7px'}},h('label',null,'Food name'),h('input',{type:'text',placeholder:'e.g. Electrolyte drink',value:manual.name,onChange:e=>setManual(p=>({...p,name:e.target.value})),style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}})),
           h('div',{className:'man-grid'},
