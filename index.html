@@ -140,6 +140,16 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 .wbc{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
 .wb{width:100%;border-radius:3px 3px 0 0;min-height:3px;transition:height .4s}
 .wbl{font-size:9px;color:var(--text3)}
+.range-tabs{display:flex;gap:2px;background:var(--surface2);padding:3px;border-radius:var(--radius-sm);border:1px solid var(--border)}
+.rtab{flex:1;padding:5px 4px;border-radius:5px;font-size:11px;font-weight:600;color:var(--text3);text-align:center;cursor:pointer;transition:all .15s;white-space:nowrap;border:none;background:none}
+.rtab.on{background:var(--accent);color:#0a0a08}
+.chart-scroll{overflow-x:auto;padding-bottom:4px}
+.chart-scroll::-webkit-scrollbar{height:3px}
+.chart-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.bar-chart{display:flex;gap:2px;align-items:flex-end;min-width:100%}
+.bc{display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0}
+.bcbar{border-radius:3px 3px 0 0;min-height:3px;transition:height .3s}
+.bclbl{font-size:8px;color:var(--text3);writing-mode:horizontal-tb;text-align:center;line-height:1.2}
 .grow{display:flex;flex-direction:column;gap:4px;margin-bottom:9px}
 .grow label{font-size:12px;color:var(--text3)}
 .grow input,.grow select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;outline:none;width:100%;-webkit-appearance:none}
@@ -269,6 +279,53 @@ function localTime(isoStr) {
   // Display time in user's local timezone
   return new Date(isoStr).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 }
+
+// Returns array of date strings for a given range, and a bucket function for grouping
+function getRangeDates(range) {
+  const now=new Date();
+  const days=range==='7d'?7:range==='2w'?14:range==='1m'?30:range==='3m'?91:range==='6m'?182:365;
+  const dates=Array.from({length:days},(_,i)=>{const d=new Date(now);d.setDate(d.getDate()-(days-1-i));return localDate(d);});
+  return dates;
+}
+
+// Group an array of {date, calories, protein, carbs, fat} by week or month
+function bucketData(dates, entries, range) {
+  if(range==='7d'||range==='2w'){
+    // Daily bars
+    return dates.map(d=>{
+      const dayE=entries[d]||[];
+      const tot=dayE.reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
+      const dd=new Date(d+'T12:00:00');
+      return {label:['Su','Mo','Tu','We','Th','Fr','Sa'][dd.getDay()],cal:tot.cal,p:tot.p,c:tot.c,f:tot.f,date:d,days:1};
+    });
+  }
+  if(range==='1m'){
+    // Daily bars, label every 5th
+    return dates.map((d,i)=>{
+      const dayE=entries[d]||[];
+      const tot=dayE.reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
+      const dd=new Date(d+'T12:00:00');
+      return {label:(i%5===0||i===dates.length-1)?String(dd.getDate()):'',cal:tot.cal,p:tot.p,c:tot.c,f:tot.f,date:d,days:1};
+    });
+  }
+  // For 3m, 6m, 1y: group by week
+  const buckets=[];
+  let i=0;
+  while(i<dates.length){
+    const slice=dates.slice(i,i+7);
+    const cal=slice.reduce((s,d)=>(entries[d]||[]).reduce((a,x)=>a+(x.calories||0),s),0);
+    const p=slice.reduce((s,d)=>(entries[d]||[]).reduce((a,x)=>a+(x.protein||0),s),0);
+    const c=slice.reduce((s,d)=>(entries[d]||[]).reduce((a,x)=>a+(x.carbs||0),s),0);
+    const f=slice.reduce((s,d)=>(entries[d]||[]).reduce((a,x)=>a+(x.fat||0),s),0);
+    const dd=new Date(slice[0]+'T12:00:00');
+    const lbl=dd.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    buckets.push({label:lbl,cal,p,c,f,date:slice[0],days:slice.length});
+    i+=7;
+  }
+  return buckets;
+}
+
+
 
 // ── Constants ─────────────────────────────────────────────────
 const DEF_GOALS={calories:2000,protein:150,carbs:200,fat:65,weight:75,target_weight:70,body_fat:20,target_body_fat:15};
@@ -443,14 +500,36 @@ function EditMealOverlay({entry,advancedMode,onSave,onDelete,onClose}) {
 }
 
 
-function LibraryOverlay({savedFoods,onLog,onAddToPrompt,onDelete,onClose,mode}) {
+function LibraryOverlay({savedFoods,onLog,onAddToPrompt,onDelete,onUpdateServing,onClose,mode}) {
   const [search,setSearch]=useState('');
-  const [portions,setPortions]=useState({});
+  const [amounts,setAmounts]=useState({}); // {food.id: string amount typed by user}
+  const [editServing,setEditServing]=useState({}); // {food.id: {size,unit} being edited}
   const filtered=savedFoods.filter(f=>!search||f.name.toLowerCase().includes(search.toLowerCase()));
 
-  function getPortion(id){ return portions[id]||1; }
-  function scaledMacros(food,p){
-    return {calories:Math.round((food.calories||0)*p),protein:Math.round((food.protein||0)*p),carbs:Math.round((food.carbs||0)*p),fat:Math.round((food.fat||0)*p),fiber:Math.round((food.fiber||0)*p),micros:Object.fromEntries(Object.entries(food.micros||{}).map(([k,v])=>[k,Math.round(v*p)]))};
+  const UNITS=['serving','g','oz','ml','cup','tbsp','tsp','piece','scoop'];
+
+  function getAmount(food){
+    // Amount is what the user typed — in serving_unit units
+    const raw=amounts[food.id];
+    return raw!==undefined?raw:String(food.serving_size||1);
+  }
+
+  function getMultiplier(food){
+    const amt=parseFloat(getAmount(food))||0;
+    const base=parseFloat(food.serving_size)||1;
+    return base>0?amt/base:1;
+  }
+
+  function scaledMacros(food){
+    const m=getMultiplier(food);
+    return {
+      calories:Math.round((food.calories||0)*m),
+      protein:Math.round((food.protein||0)*m),
+      carbs:Math.round((food.carbs||0)*m),
+      fat:Math.round((food.fat||0)*m),
+      fiber:Math.round((food.fiber||0)*m),
+      micros:Object.fromEntries(Object.entries(food.micros||{}).map(([k,v])=>[k,Math.round(v*m)]))
+    };
   }
 
   return h('div',{className:'ov',onClick:onClose},
@@ -459,37 +538,92 @@ function LibraryOverlay({savedFoods,onLog,onAddToPrompt,onDelete,onClose,mode}) 
         h('div',{className:'ovtitle'},mode==='add'?'Add base meal to prompt':'My food library'),
         h('button',{className:'ovcl',onClick:onClose},'✕')
       ),
-      mode==='add'&&h('div',{style:{fontSize:'12px',color:'var(--text2)',marginBottom:'10px',lineHeight:1.5}},'Select a saved meal as your base. You can then add extra items in the AI prompt.'),
+      mode==='add'&&h('div',{style:{fontSize:'12px',color:'var(--text2)',marginBottom:'10px',lineHeight:1.5}},'Pick a meal as your base. Type your amount, then tap "Use as base".'),
       h('input',{className:'lib-search',type:'text',placeholder:'Search saved foods…',value:search,onChange:e=>setSearch(e.target.value)}),
       h('div',{className:'liblist'},
         filtered.length===0&&h('div',{className:'empty'},h('div',{className:'eico'},'📚'),'No saved foods yet',h('div',{style:{marginTop:'5px',fontSize:'11px'}},'Add meals from the AI input or manual tab')),
         filtered.map(food=>{
-          const p=getPortion(food.id);
-          const sm=scaledMacros(food,p);
+          const sm=scaledMacros(food);
+          const amt=getAmount(food);
+          const unit=food.serving_unit||'serving';
+          const servingBase=food.serving_size||1;
+          const isEditing=!!editServing[food.id];
+
           return h('div',{key:food.id,className:'libitem'},
+            // Header: name + action buttons
             h('div',{className:'libitem-top'},
               h('div',{style:{flex:1,minWidth:0}},
                 h('div',{className:'libname'},food.name),
-                food.description&&h('div',{className:'libdesc'},food.description)
+                food.description&&h('div',{className:'libdesc'},food.description),
+                h('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'2px'}},
+                  'Base: '+servingBase+' '+unit+' = '+food.calories+' kcal'
+                )
               ),
               h('div',{style:{display:'flex',gap:'5px',flexShrink:0}},
                 mode==='add'
-                  ? h('button',{className:'libbtn add',onClick:()=>onAddToPrompt(food,p,sm)},'+ Use as base')
-                  : h('button',{className:'libbtn log',onClick:()=>onLog(food,p,sm)},'Log'),
+                  ? h('button',{className:'libbtn add',onClick:()=>onAddToPrompt(food,getMultiplier(food),sm)},'+ Use as base')
+                  : h('button',{className:'libbtn log',onClick:()=>onLog(food,getMultiplier(food),sm)},'Log'),
                 h('button',{className:'libbtn del',onClick:()=>onDelete(food.id)},'✕')
               )
             ),
+
+            // Amount input — type exact amount in the food's unit
+            h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginTop:'7px',marginBottom:'5px'}},
+              h('div',{style:{fontSize:'11px',color:'var(--text3)',flexShrink:0}},'Amount:'),
+              h('input',{
+                type:'number',
+                min:'0',
+                step:'any',
+                value:amt,
+                onChange:e=>setAmounts(p=>({...p,[food.id]:e.target.value})),
+                style:{width:'80px',background:'var(--surface3)',border:'1px solid var(--accent)',borderRadius:'5px',padding:'4px 8px',color:'var(--text)',fontSize:'13px',fontWeight:600,outline:'none',textAlign:'center'}
+              }),
+              h('span',{style:{fontSize:'12px',color:'var(--text2)',flexShrink:0}},unit),
+              h('button',{
+                onClick:()=>setEditServing(p=>({...p,[food.id]:!p[food.id]?{size:String(servingBase),unit}:undefined})),
+                style:{fontSize:'10px',color:'var(--text3)',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'4px',padding:'3px 7px',cursor:'pointer',marginLeft:'auto',whiteSpace:'nowrap'}
+              }, isEditing?'Done':'Edit serving')
+            ),
+
+            // Edit serving size (reference unit)
+            isEditing&&h('div',{style:{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'8px',marginBottom:'7px'}},
+              h('div',{style:{fontSize:'10px',color:'var(--text3)',marginBottom:'6px'}},'Set reference serving — macros above are per this amount:'),
+              h('div',{style:{display:'flex',gap:'6px',alignItems:'center'}},
+                h('input',{
+                  type:'number',min:'0.01',step:'any',
+                  value:editServing[food.id]?.size||String(servingBase),
+                  onChange:e=>setEditServing(p=>({...p,[food.id]:{...p[food.id],size:e.target.value}})),
+                  style:{width:'70px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'4px 8px',color:'var(--text)',fontSize:'13px',outline:'none',textAlign:'center'}
+                }),
+                h('select',{
+                  value:editServing[food.id]?.unit||unit,
+                  onChange:e=>setEditServing(p=>({...p,[food.id]:{...p[food.id],unit:e.target.value}})),
+                  style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'4px 7px',color:'var(--text)',fontSize:'12px',outline:'none',flex:1}
+                },
+                  UNITS.map(u=>h('option',{key:u,value:u},u))
+                ),
+                h('button',{
+                  onClick:()=>{
+                    const es=editServing[food.id];
+                    if(es){
+                      const newSize=parseFloat(es.size)||1;
+                      const newUnit=es.unit||unit;
+                      onUpdateServing(food.id,newSize,newUnit);
+                      setEditServing(p=>({...p,[food.id]:undefined}));
+                    }
+                  },
+                  style:{padding:'4px 10px',background:'var(--accent)',color:'#0a0a08',border:'none',borderRadius:'5px',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}
+                },'Save')
+              )
+            ),
+
+            // Live macro preview
             h('div',{className:'pills'},
               h('span',{className:'mp cal'},sm.calories+' kcal'),
               h('span',{className:'mp p'},'P '+sm.protein+'g'),
               h('span',{className:'mp c'},'C '+sm.carbs+'g'),
               h('span',{className:'mp f'},'F '+sm.fat+'g'),
-              food.use_count>1&&h('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 4px'}},'×'+food.use_count)
-            ),
-            h('div',{className:'portion-row'},
-              h('span',{className:'portion-lbl'},'Portions:'),
-              h('input',{type:'range',className:'portion-slider',min:'0.25',max:'4',step:'0.25',value:p,onChange:e=>setPortions(prev=>({...prev,[food.id]:parseFloat(e.target.value)}))}),
-              h('span',{className:'portion-val'},p+'×')
+              food.use_count>1&&h('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 4px'}},'×'+food.use_count+' logged')
             )
           );
         })
@@ -509,6 +643,7 @@ function App({user,onLogout}) {
   const [goals,setGoals]=useState(DEF_GOALS);
   const [savedFoods,setSavedFoods]=useState([]);
   const [adviceHistory,setAdviceHistory]=useState([]);
+  const [weekRange,setWeekRange]=useState('7d'); // '7d','1m','3m','6m','1y'
   // Input state
   const [inputMode,setInputMode]=useState('ai');
   const [aiText,setAiText]=useState('');
@@ -550,7 +685,7 @@ function App({user,onLogout}) {
       const {data:g}=await sb.from('goals').select('*').eq('user_id',user.id).single();
       if(g)setGoals({calories:g.calories,protein:g.protein,carbs:g.carbs,fat:g.fat,weight:g.weight,target_weight:g.target_weight,body_fat:g.body_fat,target_body_fat:g.target_body_fat});
       // Load 60 days of entries
-      const since=new Date(); since.setDate(since.getDate()-60);
+      const since=new Date(); since.setDate(since.getDate()-366);
       const {data:fe}=await sb.from('food_entries').select('*').eq('user_id',user.id).gte('eaten_date',localDate(since)).order('eaten_at',{ascending:true});
       if(fe){
         const map={};
@@ -595,7 +730,8 @@ function App({user,onLogout}) {
       setSavedFoods(p=>p.map(f=>f.id===existing.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
       return;
     }
-    const row={user_id:user.id,name:entry.name,description:entry.description||'',calories:Math.round(entry.calories||0),protein:Math.round(entry.protein||0),carbs:Math.round(entry.carbs||0),fat:Math.round(entry.fat||0),fiber:Math.round(entry.fiber||0),micros:entry.micros||{}};
+    // Default: macros stored are for 1 serving (user can edit serving size in the library)
+    const row={user_id:user.id,name:entry.name,description:entry.description||'',calories:Math.round(entry.calories||0),protein:Math.round(entry.protein||0),carbs:Math.round(entry.carbs||0),fat:Math.round(entry.fat||0),fiber:Math.round(entry.fiber||0),micros:entry.micros||{},serving_size:entry.serving_size||1,serving_unit:entry.serving_unit||'serving'};
     const {data:saved}=await sb.from('saved_foods').insert(row).select().single();
     if(saved)setSavedFoods(p=>[saved,...p]);
   }
@@ -729,8 +865,9 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   }
 
   // ── Library actions ──────────────────────────────────────────
-  async function logFromLibrary(food,portion,scaledMacros){
-    await saveEntry({name:food.name,description:food.description||'',...scaledMacros,micros:Object.fromEntries(Object.entries(food.micros||{}).map(([k,v])=>[k,Math.round(v*portion)]))});
+  async function logFromLibrary(food,multiplier,scaledMacros){
+    // scaledMacros already computed by LibraryOverlay based on user's typed amount
+    await saveEntry({name:food.name,description:food.description||'',...scaledMacros});
     await sb.from('saved_foods').update({use_count:food.use_count+1,updated_at:new Date().toISOString()}).eq('id',food.id);
     setSavedFoods(p=>p.map(f=>f.id===food.id?{...f,use_count:f.use_count+1}:f).sort((a,b)=>b.use_count-a.use_count));
     setLibMode(null);setView('today');
@@ -759,6 +896,11 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   async function deleteFromLibrary(id){
     await sb.from('saved_foods').delete().eq('id',id).eq('user_id',user.id);
     setSavedFoods(p=>p.filter(f=>f.id!==id));
+  }
+
+  async function updateServingSize(id,newSize,newUnit){
+    await sb.from('saved_foods').update({serving_size:newSize,serving_unit:newUnit,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
+    setSavedFoods(p=>p.map(f=>f.id===id?{...f,serving_size:newSize,serving_unit:newUnit}:f));
   }
 
   // ── Entry edits ──────────────────────────────────────────────
@@ -998,14 +1140,120 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   }
 
   function ViewWeek(){
+    const RANGES=[{id:'7d',label:'Week'},{id:'2w',label:'2 Wks'},{id:'1m',label:'Month'},{id:'3m',label:'3 Mo'},{id:'6m',label:'6 Mo'},{id:'1y',label:'Year'}];
+    const days=getRangeDates(weekRange);
+    const buckets=bucketData(days,entries,weekRange);
+    const tod=todayStr();
+
+    // Stats over the range
+    const rangeTotals=days.reduce((acc,d)=>{
+      (entries[d]||[]).forEach(x=>{acc.calories+=x.calories||0;acc.protein+=x.protein||0;acc.carbs+=x.carbs||0;acc.fat+=x.fat||0;});
+      return acc;
+    },{calories:0,protein:0,carbs:0,fat:0});
+
+    // Only count days that have at least one entry (for realistic averages)
+    const activeDays=days.filter(d=>(entries[d]||[]).length>0).length||1;
+    const totalDays=days.length;
+
+    const maxCal=Math.max(...buckets.map(b=>b.cal),1);
+    const chartHeight=80;
+    // Bar width based on number of buckets
+    const barW=weekRange==='7d'?36:weekRange==='2w'?26:weekRange==='1m'?14:22;
+
+    const rangeLabel={
+      '7d':'Last 7 days','2w':'Last 2 weeks','1m':'Last 30 days','3m':'Last 3 months','6m':'Last 6 months','1y':'Last year'
+    }[weekRange];
+
+    const perUnit=(weekRange==='7d'||weekRange==='2w')?'day':weekRange==='1m'?'day':'week';
+    const divisor=(weekRange==='7d'||weekRange==='2w'||weekRange==='1m')?activeDays:buckets.filter(b=>b.cal>0).length||1;
+
     return h('div',null,
-      h('h1',{className:'stitle'},'This week'),
-      h('div',{className:'card'},h('div',{className:'ctitle'},'Calories — last 7 days'),h(WeekChart,{entries})),
-      h('div',{className:'g2',style:{marginBottom:'12px'}},
-        [['Total calories',Math.round(weekTotals.calories),'kcal'],['Daily avg',Math.round(weekTotals.calories/7),'kcal'],['Total protein',Math.round(weekTotals.protein),'g'],['Avg protein/day',Math.round(weekTotals.protein/7),'g']].map(([lbl,val,unit])=>
-          h('div',{key:lbl,className:'card',style:{marginBottom:0}},h('div',{className:'ctitle'},lbl),h('div',{style:{display:'flex',alignItems:'baseline',gap:'3px'}},h('span',{className:'snum',style:{fontSize:'24px'}},val),h('span',{className:'sunit'},unit)))
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'14px'}},
+        h('h1',{className:'stitle',style:{margin:0}},rangeLabel),
+        h('div',{className:'range-tabs'},
+          RANGES.map(r=>h('button',{key:r.id,className:'rtab'+(weekRange===r.id?' on':''),onClick:()=>setWeekRange(r.id)},r.label))
         )
       ),
+
+      // Bar chart card
+      h('div',{className:'card'},
+        h('div',{className:'ctitle'},'Calories per '+(weekRange==='7d'||weekRange==='2w'||weekRange==='1m'?'day':'week')),
+        h('div',{className:'chart-scroll'},
+          h('div',{className:'bar-chart',style:{height:(chartHeight+20)+'px',alignItems:'flex-end',gap:weekRange==='7d'?'4px':'2px',paddingBottom:'18px',position:'relative',minWidth:weekRange==='7d'?'100%':(buckets.length*barW+20)+'px'}},
+            buckets.map((b,i)=>{
+              const ht=b.cal>0?Math.max(4,Math.round((b.cal/maxCal)*chartHeight)):2;
+              const isToday=b.date===tod;
+              return h('div',{key:i,className:'bc',style:{width:barW+'px',flexShrink:0}},
+                b.cal>0&&h('div',{style:{fontSize:'8px',color:'var(--text2)',marginBottom:'2px',textAlign:'center'}},
+                  weekRange==='7d'||weekRange==='1m'?Math.round(b.cal):Math.round(b.cal/b.days)+'/d'
+                ),
+                h('div',{className:'bcbar',style:{width:'100%',height:ht+'px',background:isToday?'#ff6b1a':b.cal>0?'rgba(255,107,26,.5)':'rgba(255,107,26,.1)',borderRadius:'3px 3px 0 0'}}),
+                h('div',{className:'bclbl'},b.label)
+              );
+            })
+          )
+        )
+      ),
+
+      // Stats grid
+      h('div',{className:'g2',style:{gap:'10px',marginBottom:'12px'}},
+        [
+          ['Avg cal/'+perUnit, Math.round(rangeTotals.calories/divisor), 'kcal'],
+          ['Avg protein/'+perUnit, Math.round(rangeTotals.protein/divisor), 'g'],
+          ['Total calories', Math.round(rangeTotals.calories), 'kcal'],
+          ['Total protein', Math.round(rangeTotals.protein), 'g'],
+          ['Active days', activeDays, 'of '+totalDays],
+          ['Avg carbs/'+perUnit, Math.round(rangeTotals.carbs/divisor), 'g'],
+        ].map(([lbl,val,unit])=>
+          h('div',{key:lbl,className:'card',style:{marginBottom:0}},
+            h('div',{className:'ctitle'},lbl),
+            h('div',{style:{display:'flex',alignItems:'baseline',gap:'3px'}},
+              h('span',{className:'snum',style:{fontSize:'22px'}},val),
+              h('span',{className:'sunit'},unit)
+            )
+          )
+        )
+      ),
+
+      // Macro breakdown for the period
+      h('div',{className:'card',style:{marginBottom:'12px'}},
+        h('div',{className:'ctitle'},'Macro breakdown — '+rangeLabel.toLowerCase()),
+        h('div',{style:{display:'flex',gap:'8px',marginBottom:'10px'}},
+          [['Protein','#ff6b1a',rangeTotals.protein],['Carbs','#f0b429',rangeTotals.carbs],['Fat','#e08c3a',rangeTotals.fat]].map(([n,c,v])=>{
+            const total=rangeTotals.protein+rangeTotals.carbs+rangeTotals.fat||1;
+            const pct=Math.round((v/total)*100);
+            return h('div',{key:n,style:{flex:1,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'8px',textAlign:'center'}},
+              h('div',{style:{fontSize:'18px',fontWeight:600,color:c,fontFamily:'DM Serif Display,serif'}},pct+'%'),
+              h('div',{style:{fontSize:'10px',color:'var(--text3)',marginTop:'2px'}},n),
+              h('div',{style:{fontSize:'11px',color:'var(--text2)'}},Math.round(v)+'g total')
+            );
+          })
+        ),
+        h('div',{style:{height:'6px',borderRadius:'3px',overflow:'hidden',display:'flex',gap:'1px'}},
+          [['#ff6b1a',rangeTotals.protein],['#f0b429',rangeTotals.carbs],['#e08c3a',rangeTotals.fat]].map(([c,v],i)=>{
+            const total=rangeTotals.protein+rangeTotals.carbs+rangeTotals.fat||1;
+            return h('div',{key:i,style:{width:((v/total)*100)+'%',background:c,borderRadius:'3px',transition:'width .5s'}});
+          })
+        )
+      ),
+
+      // Goal comparison
+      h('div',{className:'card',style:{marginBottom:'12px'}},
+        h('div',{className:'ctitle'},'vs. your daily goals'),
+        [['Calories',Math.round(rangeTotals.calories/activeDays),goals.calories,'kcal','#ff6b1a'],['Protein',Math.round(rangeTotals.protein/activeDays),goals.protein,'g','#ff6b1a'],['Carbs',Math.round(rangeTotals.carbs/activeDays),goals.carbs,'g','#f0b429'],['Fat',Math.round(rangeTotals.fat/activeDays),goals.fat,'g','#e08c3a']].map(([n,avg,goal,unit,c])=>{
+          const pct=goal>0?Math.min(120,(avg/goal)*100):0;
+          const over=avg>goal&&goal>0;
+          return h('div',{key:n,className:'mrow'},
+            h('div',{className:'mlrow'},
+              h('span',{className:'mname',style:{color:over?'#e03030':c}},n),
+              h('span',{className:'mvals'},avg+unit+' avg / '+goal+unit+' goal '+(over?'⬆':''))
+            ),
+            h('div',{className:'pbar'},h('div',{className:'pfill',style:{width:Math.min(100,pct)+'%',background:over?'#e03030':c}}))
+          );
+        })
+      ),
+
+      // AI Coach
       h('div',{className:'card'},
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
           h('div',{className:'ctitle',style:{margin:0}},'AI Coach'),
@@ -1013,7 +1261,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
         ),
         advLoading&&h(Bubble),
         aiAdvice&&h('div',null,h('div',{className:'aihdr'},'🤖 AI Coach'),h('div',{className:'aibox'},aiAdvice)),
-        !aiAdvice&&!advLoading&&h('div',{className:'empty',style:{padding:'14px 0'}},'Click "Get advice" for a personalised weekly analysis')
+        !aiAdvice&&!advLoading&&h('div',{className:'empty',style:{padding:'14px 0'}},'Click "Get advice" for a personalised analysis')
       )
     );
   }
@@ -1152,7 +1400,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   return h('div',{className:'app'},
 
     // Library overlay
-    libMode&&h(LibraryOverlay,{savedFoods,onLog:logFromLibrary,onAddToPrompt:addToPrompt,onDelete:deleteFromLibrary,onClose:()=>setLibMode(null),mode:libMode}),
+    libMode&&h(LibraryOverlay,{savedFoods,onLog:logFromLibrary,onAddToPrompt:addToPrompt,onDelete:deleteFromLibrary,onUpdateServing:updateServingSize,onClose:()=>setLibMode(null),mode:libMode}),
 
     // Estimate overlay
     editingMeal&&h(EditMealOverlay,{
