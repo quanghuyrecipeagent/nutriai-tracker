@@ -643,7 +643,12 @@ function App({user,onLogout}) {
   const [goals,setGoals]=useState(DEF_GOALS);
   const [savedFoods,setSavedFoods]=useState([]);
   const [adviceHistory,setAdviceHistory]=useState([]);
-  const [weekRange,setWeekRange]=useState('7d'); // '7d','1m','3m','6m','1y'
+  const [weekRange,setWeekRange]=useState('7d');
+  const [activities,setActivities]=useState({});   // {date: [{id,name,duration_min,calories_burned,notes}]}
+  const [fitnessProfile,setFitnessProfile]=useState({height_cm:'',age:'',sex:'male',activity_level:'moderate'});
+  const [fitbitToken,setFitbitToken]=useState(null);   // {access_token, refresh_token, expires_at}
+  const [fitbitSyncing,setFitbitSyncing]=useState(false);
+  const [fitbitLastSync,setFitbitLastSync]=useState(null);
   // Input state
   const [inputMode,setInputMode]=useState('ai');
   const [aiText,setAiText]=useState('');
@@ -702,7 +707,47 @@ function App({user,onLogout}) {
       if(sf)setSavedFoods(sf);
       const {data:ah}=await sb.from('ai_advice').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(10);
       if(ah)setAdviceHistory(ah);
+
+      // Load activities (last 366 days)
+      const {data:acts}=await sb.from('activities').select('*').eq('user_id',user.id).gte('logged_date',localDate(since)).order('logged_at',{ascending:true});
+      if(acts){
+        const amap={};
+        acts.forEach(r=>{const d=r.logged_date;if(!amap[d])amap[d]=[];amap[d].push(r);});
+        setActivities(amap);
+      }
+
+      // Load fitness profile fields from profiles table
+      if(prof){
+        setFitnessProfile({
+          height_cm:prof.height_cm||'',
+          age:prof.age||'',
+          sex:prof.sex||'male',
+          activity_level:prof.activity_level||'moderate'
+        });
+      }
+      // Load Fitbit tokens
+      const {data:ft}=await sb.from('fitbit_tokens').select('*').eq('user_id',user.id).single();
+      if(ft)setFitbitToken({access_token:ft.access_token,refresh_token:ft.refresh_token,expires_at:ft.expires_at});
+
       setSyncing(false); setInitDone(true);
+
+      // Handle OAuth callback — check URL params for Fitbit tokens
+      const params=new URLSearchParams(window.location.search);
+      if(params.get('fitbit_access_token')){
+        const at=params.get('fitbit_access_token');
+        const rt=params.get('fitbit_refresh_token')||'';
+        const expiresAt=new Date(Date.now()+(parseInt(params.get('fitbit_expires_in')||3600)*1000)).toISOString();
+        // Save to Supabase
+        await sb.from('fitbit_tokens').upsert({user_id:user.id,access_token:at,refresh_token:rt,expires_at:expiresAt},{onConflict:'user_id'});
+        setFitbitToken({access_token:at,refresh_token:rt,expires_at:expiresAt});
+        // Clean URL
+        window.history.replaceState({},'',window.location.pathname);
+        setView('activity');
+      }
+      if(params.get('fitbit_error')){
+        console.error('Fitbit OAuth error:',params.get('fitbit_error'));
+        window.history.replaceState({},'',window.location.pathname);
+      }
     }
     init();
   },[user.id]);
@@ -910,19 +955,31 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   }
   async function updName(date,id,val){
     if(!val.trim())return;
-    await sb.from('food_entries').update({name:val.trim(),updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
+    const {error:ne}=await sb.from('food_entries').update({name:val.trim()}).eq('id',id).eq('user_id',user.id);if(ne)console.error('updName:',ne);
     setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,name:val.trim()}:x)}));
     setEditName(null);
   }
   async function updMacro(date,id,field,val){
     const num=Math.round(parseFloat(val)||0);
-    await sb.from('food_entries').update({[field]:num,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
+    const {error:me}=await sb.from('food_entries').update({[field]:num}).eq('id',id).eq('user_id',user.id);if(me)console.error('updMacro:',me);
     setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,[field]:num}:x)}));
     setEditMacro(null);
   }
   async function updateFullMeal(date,id,updates){
-    await sb.from('food_entries').update({...updates,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',user.id);
-    setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,...updates}:x)}));
+    // Only send columns that exist in food_entries — no updated_at unless confirmed
+    const payload={
+      name:updates.name,
+      description:updates.description||'',
+      calories:Math.round(updates.calories||0),
+      protein:Math.round(updates.protein||0),
+      carbs:Math.round(updates.carbs||0),
+      fat:Math.round(updates.fat||0),
+      fiber:Math.round(updates.fiber||0),
+      micros:updates.micros||{}
+    };
+    const {error}=await sb.from('food_entries').update(payload).eq('id',id).eq('user_id',user.id);
+    if(error){console.error('updateFullMeal error:',error);return;}
+    setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,...payload}:x)}));
     setEditingMeal(null);
   }
   async function deleteAndCloseEdit(date,id){
@@ -944,6 +1001,100 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     setSettings(p=>({...p,[key]:val}));
     if(key==='advancedMode')await sb.from('profiles').update({advanced_mode:val}).eq('id',user.id);
   }
+
+  // ── TDEE (Total Daily Energy Expenditure) ────────────────────
+  function calcTDEE(){
+    const w=parseFloat(goals.weight)||0;
+    const h=parseFloat(fitnessProfile.height_cm)||0;
+    const a=parseInt(fitnessProfile.age)||0;
+    const sex=fitnessProfile.sex||'male';
+    if(!w||!h||!a)return null;
+    // Mifflin-St Jeor BMR
+    const bmr=sex==='female'
+      ?(10*w)+(6.25*h)-(5*a)-161
+      :(10*w)+(6.25*h)-(5*a)+5;
+    const multipliers={sedentary:1.2,light:1.375,moderate:1.55,active:1.725,very_active:1.9};
+    const mult=multipliers[fitnessProfile.activity_level]||1.55;
+    return Math.round(bmr*mult);
+  }
+
+  async function saveFitnessProfile(fp){
+    setFitnessProfile(fp);
+    await sb.from('profiles').update({
+      height_cm:parseFloat(fp.height_cm)||null,
+      age:parseInt(fp.age)||null,
+      sex:fp.sex,
+      activity_level:fp.activity_level
+    }).eq('id',user.id);
+  }
+
+  // ── Activity log ─────────────────────────────────────────────
+  async function logActivity(act){
+    const tod=todayStr();
+    const row={user_id:user.id,logged_date:tod,logged_at:new Date().toISOString(),name:act.name,duration_min:Math.round(act.duration_min||0),calories_burned:Math.round(act.calories_burned||0),notes:act.notes||''};
+    const {data:ins,error}=await sb.from('activities').insert(row).select().single();
+    if(error){console.error('logActivity:',error);return;}
+    if(ins)setActivities(p=>({...p,[tod]:[...(p[tod]||[]),ins]}));
+  }
+
+  async function deleteActivity(date,id){
+    await sb.from('activities').delete().eq('id',id).eq('user_id',user.id);
+    setActivities(p=>({...p,[date]:(p[date]||[]).filter(a=>a.id!==id)}));
+  }
+
+  function connectFitbit(){
+    const clientId='782537530246-8j8tsf3rot20tg0mcr21ska30b4phauf.apps.googleusercontent.com';
+    const redirectUri=encodeURIComponent('https://nutriai-tracker-kappa.vercel.app/api/fitbit-callback');
+    const scope=encodeURIComponent('https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read');
+    const url=`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&access_type=offline&scope=${scope}&prompt=consent`;
+    window.location.href=url;
+  }
+
+  async function disconnectFitbit(){
+    await sb.from('fitbit_tokens').delete().eq('user_id',user.id);
+    setFitbitToken(null);setFitbitLastSync(null);
+  }
+
+  async function syncFitbit(dateStr){
+    if(!fitbitToken)return;
+    setFitbitSyncing(true);
+    try{
+      const res=await fetch('/api/fitbit-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:fitbitToken.access_token,refresh_token:fitbitToken.refresh_token,date:dateStr||todayStr()})});
+      const data=await res.json();
+      if(data.error){console.error('Fitbit sync error:',data.error);setFitbitSyncing(false);return;}
+
+      // If token was refreshed, save the new one
+      if(data.new_access_token){
+        const newToken={access_token:data.new_access_token,refresh_token:data.new_refresh_token||fitbitToken.refresh_token,expires_at:new Date(Date.now()+3600000).toISOString()};
+        await sb.from('fitbit_tokens').upsert({user_id:user.id,...newToken},{onConflict:'user_id'});
+        setFitbitToken(newToken);
+      }
+
+      // Log as activity if we got data
+      if(data.steps>0||data.calories_burned>0){
+        const actDate=dateStr||todayStr();
+        // Check if already logged for this date
+        const existing=(activities[actDate]||[]).find(a=>a.name==='Fitbit daily activity');
+        if(existing){
+          // Update existing
+          await sb.from('activities').update({calories_burned:data.calories_burned,notes:`${data.steps.toLocaleString()} steps · ${data.active_minutes} active min`}).eq('id',existing.id);
+          setActivities(p=>({...p,[actDate]:(p[actDate]||[]).map(a=>a.id===existing.id?{...a,calories_burned:data.calories_burned,notes:`${data.steps.toLocaleString()} steps · ${data.active_minutes} active min`}:a)}));
+        } else {
+          // Insert new
+          const row={user_id:user.id,logged_date:actDate,logged_at:new Date().toISOString(),name:'Fitbit daily activity',duration_min:data.active_minutes||0,calories_burned:data.calories_burned||0,notes:`${data.steps.toLocaleString()} steps · ${data.active_minutes} active min`};
+          const {data:ins}=await sb.from('activities').insert(row).select().single();
+          if(ins)setActivities(p=>({...p,[actDate]:[...(p[actDate]||[]),ins]}));
+        }
+        setFitbitLastSync(new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
+      }
+    }catch(err){console.error('Fitbit sync failed:',err);}
+    setFitbitSyncing(false);
+  }
+
+  // Auto-sync Fitbit on load if connected
+  useEffect(()=>{
+    if(fitbitToken&&initDone)syncFitbit(todayStr());
+  },[fitbitToken?.access_token,initDone]);
 
   // ── AI advice ────────────────────────────────────────────────
   async function getAdvice(){
@@ -969,7 +1120,10 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     const tod=todayStr();
     const todT=(entries[tod]||[]).reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
     const wk=last7Dates().reduce((acc,d)=>{(entries[d]||[]).forEach(x=>{acc.cal+=x.calories||0;acc.p+=x.protein||0;});return acc;},{cal:0,p:0});
-    const sys=`You are GRAMS, a direct nutrition AI. Answer in 2-4 sentences. Give clear yes/no answers. Use the user's data.\nToday (${tod}): ${Math.round(todT.cal)} kcal, ${Math.round(todT.p)}g P, ${Math.round(todT.c)}g C, ${Math.round(todT.f)}g F\nGoals: ${goals.calories} kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nWeek avg/day: ${Math.round(wk.cal/7)} kcal, ${Math.round(wk.p/7)}g P\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%`;
+    const todActs=activities[tod]||[];
+    const todBurned=todActs.reduce((s,a)=>s+a.calories_burned,0);
+    const tdee=calcTDEE();
+    const sys=`You are GRAMS, a direct nutrition AI. Answer in 2-4 sentences. Give clear yes/no answers. Use the user's data.\nToday (${tod}): ${Math.round(todT.cal)} kcal in, ${todBurned>0?todBurned+' kcal burned via logged activity,':''} ${Math.round(todT.p)}g P, ${Math.round(todT.c)}g C, ${Math.round(todT.f)}g F\nGoals: ${goals.calories} kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nTDEE: ${tdee?tdee+' kcal/day (estimated from stats)':'not set — user hasn\'t entered height/age'}\nWeek avg/day: ${Math.round(wk.cal/7)} kcal, ${Math.round(wk.p/7)}g P\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%\nNote: Activity data is tracked for context only — do not subtract calories burned from food goals.`;
     try{const reply=await callClaude([{role:'user',content:msg}],sys);setChatMsgs(p=>[...p,{role:'ai',text:reply}]);}
     catch(err){setChatMsgs(p=>[...p,{role:'ai',text:'Error: '+err.message}]);}
     setChatLoading(false);
@@ -1110,14 +1264,25 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
 
   // ── Content views ─────────────────────────────────────────────
   function ViewToday(){
+    const tod=todayStr();
+    const todayActs=activities[tod]||[];
+    const todayBurned=todayActs.reduce((s,a)=>s+a.calories_burned,0);
+    const tdee=calcTDEE();
     return h('div',null,
       h('h1',{className:'stitle'},"Today"),
       h('div',{className:'g2',style:{marginBottom:'12px'}},
         h('div',{className:'card',style:{marginBottom:0}},
-          h('div',{className:'ctitle'},'Calories'),
+          h('div',{className:'ctitle'},'Calories in'),
           h('div',{style:{display:'flex',alignItems:'baseline',gap:'4px',marginBottom:'9px'}},h('span',{className:'snum',style:{color:calColor}},Math.round(totals.calories)),h('span',{className:'sunit'},'/ '+goals.calories+' kcal')),
           h('div',{className:'pbar'},h('div',{className:'pfill',style:{width:Math.min(100,(totals.calories/goals.calories)*100)+'%',background:calColor}})),
-          h('div',{style:{marginTop:'6px',fontSize:'12px',color:'var(--text2)'}},goals.calories-totals.calories>0?Math.round(goals.calories-totals.calories)+' kcal left':Math.round(totals.calories-goals.calories)+' kcal over')
+          h('div',{style:{marginTop:'6px',fontSize:'12px',color:'var(--text2)'}},goals.calories-totals.calories>0?Math.round(goals.calories-totals.calories)+' kcal left':Math.round(totals.calories-goals.calories)+' kcal over'),
+          (todayBurned>0||tdee)&&h('div',{style:{marginTop:'8px',paddingTop:'8px',borderTop:'1px solid var(--border)',display:'flex',gap:'10px',flexWrap:'wrap'}},
+            todayBurned>0&&h('div',{style:{fontSize:'11px',color:'var(--accent)'},onClick:()=>setView('activity'),title:'View activity log'},'🔥 '+todayBurned+' kcal burned'),
+            tdee&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'~'+tdee+' TDEE'),
+            tdee&&h('div',{style:{fontSize:'11px',color:totals.calories<tdee?'var(--carbs)':'var(--protein)'}},
+              totals.calories<tdee?'↓ '+(tdee-totals.calories)+' below TDEE':'↑ '+(totals.calories-tdee)+' above TDEE'
+            )
+          )
         ),
         h('div',{className:'card',style:{marginBottom:0}},h('div',{className:'ctitle'},'Split'),h(PieChart,{protein:totals.protein,carbs:totals.carbs,fat:totals.fat}))
       ),
@@ -1394,7 +1559,166 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     );
   }
 
-  const VIEWS={today:ViewToday,week:ViewWeek,chat:ViewChat,goals:ViewGoals,history:ViewHistory,advice:ViewAdvice,settings:ViewSettings};
+  function ViewActivity(){
+    const tod=todayStr();
+    const todayActs=activities[tod]||[];
+    const todayBurned=todayActs.reduce((s,a)=>s+a.calories_burned,0);
+    const tdee=calcTDEE();
+    const [actForm,setActForm]=useState({name:'',duration_min:'',calories_burned:'',notes:''});
+    const [fpForm,setFpForm]=useState({...fitnessProfile});
+    const [fpDirty,setFpDirty]=useState(false);
+    const ACTIVITY_PRESETS=[
+      {name:'Walking',metFactor:3.5},{name:'Running',metFactor:9.8},{name:'Cycling',metFactor:7.5},
+      {name:'Weight training',metFactor:4.0},{name:'HIIT',metFactor:10.0},{name:'Swimming',metFactor:6.0},
+      {name:'Yoga',metFactor:2.5},{name:'Hiking',metFactor:5.3}
+    ];
+    function estimateBurn(name,duration){
+      const w=parseFloat(goals.weight)||75;
+      const preset=ACTIVITY_PRESETS.find(p=>p.name===name);
+      const met=preset?preset.metFactor:4.0;
+      return Math.round((met*3.5*w/200)*(parseInt(duration)||0));
+    }
+
+    return h('div',null,
+      h('h1',{className:'stitle'},'Activity'),
+
+      // TDEE estimation card
+      h('div',{className:'card'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
+          h('div',{className:'ctitle',style:{margin:0}},'Estimated daily burn (TDEE)'),
+          tdee&&h('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'22px',color:'var(--accent)'}},tdee+' kcal')
+        ),
+        !tdee&&h('div',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'10px'}},'Add your height and age below to calculate your Total Daily Energy Expenditure.'),
+        h('div',{className:'g2',style:{gap:'8px',marginBottom:'10px'}},
+          [
+            {k:'height_cm',lbl:'Height (cm)',type:'number',ph:'e.g. 178'},
+            {k:'age',lbl:'Age',type:'number',ph:'e.g. 28'},
+          ].map(({k,lbl,type,ph})=>
+            h('div',{key:k,className:'grow',style:{marginBottom:0}},
+              h('label',null,lbl),
+              h('input',{type,placeholder:ph,value:fpForm[k]||'',onChange:e=>{setFpForm(p=>({...p,[k]:e.target.value}));setFpDirty(true);}})
+            )
+          )
+        ),
+        h('div',{className:'g2',style:{gap:'8px',marginBottom:'12px'}},
+          h('div',{className:'grow',style:{marginBottom:0}},
+            h('label',null,'Sex'),
+            h('select',{value:fpForm.sex||'male',onChange:e=>{setFpForm(p=>({...p,sex:e.target.value}));setFpDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}},
+              h('option',{value:'male'},'Male'),h('option',{value:'female'},'Female')
+            )
+          ),
+          h('div',{className:'grow',style:{marginBottom:0}},
+            h('label',null,'Activity level'),
+            h('select',{value:fpForm.activity_level||'moderate',onChange:e=>{setFpForm(p=>({...p,activity_level:e.target.value}));setFpDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}},
+              h('option',{value:'sedentary'},'Sedentary (desk job)'),
+              h('option',{value:'light'},'Light (1-3x/week)'),
+              h('option',{value:'moderate'},'Moderate (3-5x/week)'),
+              h('option',{value:'active'},'Active (6-7x/week)'),
+              h('option',{value:'very_active'},'Very active (2x/day)')
+            )
+          )
+        ),
+        fpDirty&&h('button',{className:'savebtn',onClick:()=>{saveFitnessProfile(fpForm);setFpDirty(false);}},'Save & recalculate'),
+        tdee&&h('div',{style:{marginTop:'10px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px',fontSize:'12px',color:'var(--text2)',lineHeight:1.6}},
+          '📊 Based on your stats, you burn approx. ',h('strong',{style:{color:'var(--accent)'}},tdee+' kcal/day'),' at rest + normal activity.\n',
+          'Your current calorie goal is ',h('strong',null,goals.calories+' kcal'),'.',
+          goals.calories<tdee
+            ?h('span',{style:{color:'var(--carbs)'}},' You\'re in a deficit of ~'+(tdee-goals.calories)+' kcal/day — good for fat loss.')
+            :goals.calories>tdee
+            ?h('span',{style:{color:'var(--protein)'}},' You\'re in a surplus of ~'+(goals.calories-tdee)+' kcal/day — good for gaining.')
+            :h('span',{style:{color:'var(--accent)'}},' You\'re eating at maintenance.')
+        )
+      ),
+
+      // Today's activity + burn
+      h('div',{className:'card'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
+          h('div',{className:'ctitle',style:{margin:0}},"Today's activity"),
+          todayBurned>0&&h('div',{style:{fontSize:'13px',color:'var(--accent)',fontWeight:600}},'🔥 '+todayBurned+' kcal burned')
+        ),
+
+        // Log activity form
+        h('div',{style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px',marginBottom:'10px'}},
+          h('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:'7px'}},'Log activity'),
+          h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'7px'}},
+            ACTIVITY_PRESETS.map(p=>h('button',{key:p.name,onClick:()=>{
+              const burn=estimateBurn(p.name,actForm.duration_min);
+              setActForm(prev=>({...prev,name:p.name,calories_burned:burn?String(burn):''}));
+            },style:{fontSize:'11px',padding:'3px 9px',background:actForm.name===p.name?'var(--accent-dim)':'var(--surface3)',color:actForm.name===p.name?'var(--accent)':'var(--text2)',border:'1px solid '+(actForm.name===p.name?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',cursor:'pointer',transition:'all .15s'}},p.name))
+          ),
+          h('div',{className:'ov-grid',style:{marginBottom:'7px'}},
+            h('div',{className:'mf'},
+              h('label',null,'Activity name'),
+              h('input',{type:'text',placeholder:'e.g. Morning run',value:actForm.name,onChange:e=>setActForm(p=>({...p,name:e.target.value}))})
+            ),
+            h('div',{className:'mf'},
+              h('label',null,'Duration (min)'),
+              h('input',{type:'number',placeholder:'30',value:actForm.duration_min,onChange:e=>{
+                const dur=e.target.value;
+                const burn=estimateBurn(actForm.name,dur);
+                setActForm(p=>({...p,duration_min:dur,calories_burned:burn?String(burn):p.calories_burned}));
+              }})
+            ),
+            h('div',{className:'mf'},
+              h('label',null,'Calories burned'),
+              h('input',{type:'number',placeholder:'auto-estimated',value:actForm.calories_burned,onChange:e=>setActForm(p=>({...p,calories_burned:e.target.value}))})
+            ),
+            h('div',{className:'mf'},
+              h('label',null,'Notes (optional)'),
+              h('input',{type:'text',placeholder:'e.g. felt great',value:actForm.notes,onChange:e=>setActForm(p=>({...p,notes:e.target.value}))})
+            )
+          ),
+          h('button',{className:'add-btn',onClick:()=>{
+            if(!actForm.name.trim())return;
+            logActivity(actForm);
+            setActForm({name:'',duration_min:'',calories_burned:'',notes:''});
+          }},'Log activity')
+        ),
+
+        // Today's logged activities
+        todayActs.length===0
+          ?h('div',{className:'empty',style:{padding:'12px 0'}},h('div',{className:'eico',style:{fontSize:'22px'}},'🏃'),h('div',null,'No activities logged today'))
+          :todayActs.map(act=>h('div',{key:act.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderTop:'1px solid var(--border)'}},
+              h('div',null,
+                h('div',{style:{fontSize:'13px',fontWeight:500}},act.name),
+                h('div',{style:{fontSize:'11px',color:'var(--text3)'}},act.duration_min>0?act.duration_min+' min':'',act.notes?' · '+act.notes:'')
+              ),
+              h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
+                act.calories_burned>0&&h('span',{style:{fontSize:'12px',color:'var(--accent)',fontWeight:500}},'🔥 '+act.calories_burned+' kcal'),
+                h('button',{onClick:()=>deleteActivity(tod,act.id),style:{fontSize:'10px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
+              )
+            ))
+      ),
+
+      // Fitbit connect card
+      h('div',{className:'card'},
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
+          h('div',{className:'ctitle',style:{margin:0}},'📱 Fitbit auto-sync'),
+          fitbitToken
+            ? h('div',{style:{display:'flex',gap:'7px',alignItems:'center'}},
+                h('button',{className:'savebtn',style:{fontSize:'11px',padding:'5px 11px'},onClick:()=>syncFitbit(todayStr()),disabled:fitbitSyncing},fitbitSyncing?'Syncing…':'↻ Sync now'),
+                h('button',{onClick:disconnectFitbit,style:{fontSize:'11px',color:'var(--danger)',background:'rgba(224,48,48,.1)',border:'1px solid rgba(224,48,48,.2)',borderRadius:'var(--radius-sm)',padding:'5px 10px',cursor:'pointer'}},'Disconnect')
+              )
+            : h('button',{className:'savebtn',style:{background:'#4285f4',fontSize:'12px',padding:'7px 14px'},onClick:connectFitbit},'🔗 Connect Fitbit')
+        ),
+        fitbitToken
+          ? h('div',null,
+              h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}},
+                h('div',{style:{width:'8px',height:'8px',borderRadius:'50%',background:'#4caf50',flexShrink:0}}),
+                h('span',{style:{fontSize:'13px',color:'var(--text2)'}},'Connected via Google Health API'),
+                fitbitLastSync&&h('span',{style:{fontSize:'11px',color:'var(--text3)'}},'· last synced '+fitbitLastSync)
+              ),
+              h('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:1.5}},'Steps, calories burned, and active minutes sync automatically each time you open the app. Appears as "Fitbit daily activity" in your log.')
+            )
+          : h('div',null,
+              h('div',{style:{fontSize:'13px',color:'var(--text2)',lineHeight:1.6,marginBottom:'8px'}},'Connect your Fitbit account to automatically sync daily steps, calories burned, and active minutes into GRAMS.'),
+              h('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:1.5}},'⚠️ Note: Activity data is for context only — it\'s never subtracted from your food goals.')
+            )
+      )
+    );
+  }
+
+  const VIEWS={today:ViewToday,week:ViewWeek,chat:ViewChat,goals:ViewGoals,history:ViewHistory,advice:ViewAdvice,activity:ViewActivity,settings:ViewSettings};
   const CurrentView=VIEWS[view]||ViewToday;
 
   return h('div',{className:'app'},
@@ -1440,7 +1764,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     // Header
     h('header',{className:'header'},
       h('div',{className:'logo'},'GRAMS'),
-      h('nav',{className:'desk-nav'},['today','week','chat','goals','history','advice','settings'].map(v=>h('button',{key:v,className:'nb'+(view===v?' on':''),onClick:()=>setView(v)},v.charAt(0).toUpperCase()+v.slice(1)))),
+      h('nav',{className:'desk-nav'},['today','week','chat','goals','history','activity','advice','settings'].map(v=>h('button',{key:v,className:'nb'+(view===v?' on':''),onClick:()=>setView(v)},v.charAt(0).toUpperCase()+v.slice(1)))),
       h('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
         syncing&&h('div',{className:'syncing'},h('div',{className:'spin-sm'}),'Syncing'),
         h('div',{style:{fontSize:'11px',color:'var(--text3)',padding:'3px 7px'}},user.email?.split('@')[0])
@@ -1455,7 +1779,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
 
     // Mobile nav
     h('nav',{className:'mob-nav'},
-      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'goals',ico:'🎯',lbl:'Goals'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
+      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'activity',ico:'🏃',lbl:'Activity'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
         h('button',{key:t.id,className:'mnbtn'+(view===t.id?' on':''),onClick:()=>setView(t.id)},h('span',{className:'mnico'},t.ico),t.lbl)
       )
     )
