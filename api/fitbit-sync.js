@@ -24,40 +24,28 @@ export default async function handler(req, res) {
     return r.json();
   }
 
-  async function queryHealthData(token) {
-    // Google Health API - query aggregated data
-    const startTime = `${targetDate}T00:00:00Z`;
-    const endTime   = `${targetDate}T23:59:59Z`;
+  let token = access_token;
+  let newRefreshToken = null;
+  const debug = { attempts: [] };
 
-    // Try the Google Health REST API endpoint
-    const r = await fetch(
-      `https://health.googleapis.com/v1/users/-/sessions?startTime=${startTime}&endTime=${endTime}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    const sessions = await r.json();
-
-    // Also try aggregated metrics
-    const metricsR = await fetch(
-      'https://health.googleapis.com/v1/users/-:aggregateMetrics',
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          metrics: ['STEPS_COUNT', 'CALORIES_EXPENDED', 'ACTIVE_MINUTES'],
-          timeRange: { startTime, endTime }
-        })
-      }
-    );
-    const metrics = await metricsR.json();
-
-    return { sessions, metrics, metricsStatus: metricsR.status, sessionsStatus: r.status };
+  // Helper to safely fetch and parse JSON
+  async function safeFetch(url, options = {}) {
+    const r = await fetch(url, options);
+    const text = await r.text();
+    debug.attempts.push({ url: url.substring(0, 80), status: r.status, preview: text.substring(0, 200) });
+    try {
+      return { status: r.status, data: JSON.parse(text) };
+    } catch(e) {
+      return { status: r.status, data: null, raw: text.substring(0, 300) };
+    }
   }
 
-  async function queryFitnessAPI(token) {
-    // Also try legacy Google Fitness API as fallback
+  try {
+    // ── Try 1: Google Fitness API (most reliable) ──────────────
     const startMs = new Date(targetDate + 'T00:00:00Z').getTime();
     const endMs   = new Date(targetDate + 'T23:59:59Z').getTime();
-    const r = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+
+    let fit = await safeFetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -71,41 +59,42 @@ export default async function handler(req, res) {
         endTimeMillis: endMs
       })
     });
-    return { data: await r.json(), status: r.status };
-  }
 
-  try {
-    let token = access_token;
-    let newRefreshToken = null;
-
-    // Try Health API
-    let healthData = await queryHealthData(token);
-
-    // If 401, refresh token
-    if (healthData.sessionsStatus === 401 || healthData.metricsStatus === 401) {
-      if (!refresh_token) return res.status(401).json({ error: 'Token expired — please reconnect' });
+    // Token expired — refresh and retry
+    if (fit.status === 401 && refresh_token) {
       const refreshed = await refreshToken();
-      if (!refreshed.access_token) return res.status(401).json({ error: 'Could not refresh token — please reconnect' });
-      token = refreshed.access_token;
-      newRefreshToken = refreshed.refresh_token || refresh_token;
-      healthData = await queryHealthData(token);
+      if (refreshed.access_token) {
+        token = refreshed.access_token;
+        newRefreshToken = refreshed.refresh_token || refresh_token;
+        fit = await safeFetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            aggregateBy: [
+              { dataTypeName: 'com.google.step_count.delta' },
+              { dataTypeName: 'com.google.calories.expended' },
+              { dataTypeName: 'com.google.active_minutes' }
+            ],
+            bucketByTime: { durationMillis: 86400000 },
+            startTimeMillis: startMs,
+            endTimeMillis: endMs
+          })
+        });
+      }
     }
 
-    // Also try Fitness API as fallback
-    const fitnessData = await queryFitnessAPI(token);
+    // ── Try 2: Google Health API ───────────────────────────────
+    const startTime = targetDate + 'T00:00:00Z';
+    const endTime   = targetDate + 'T23:59:59Z';
+    const health = await safeFetch(
+      `https://health.googleapis.com/v1/users/-/sessions?startTime=${startTime}&endTime=${endTime}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-    // Parse Health API metrics response
+    // Parse Google Fitness results
     let steps = 0, caloriesBurned = 0, activeMinutes = 0;
-
-    // Try parsing from Health API metrics
-    const metrics = healthData.metrics || {};
-    if (metrics.steps !== undefined) steps = Math.round(metrics.steps || 0);
-    if (metrics.calories !== undefined) caloriesBurned = Math.round(metrics.calories || 0);
-    if (metrics.activeMinutes !== undefined) activeMinutes = Math.round(metrics.activeMinutes || 0);
-
-    // Fall back to Fitness API if Health API returned nothing
-    if (steps === 0 && caloriesBurned === 0 && fitnessData.status === 200) {
-      (fitnessData.data.bucket || []).forEach(bucket => {
+    if (fit.data?.bucket) {
+      fit.data.bucket.forEach(bucket => {
         (bucket.dataset || []).forEach(ds => {
           (ds.point || []).forEach(point => {
             const val = point.value?.[0];
@@ -126,17 +115,10 @@ export default async function handler(req, res) {
       active_minutes: activeMinutes,
       new_access_token: token !== access_token ? token : null,
       new_refresh_token: newRefreshToken,
-      debug: {
-        health_metrics_status: healthData.metricsStatus,
-        health_sessions_status: healthData.sessionsStatus,
-        fitness_status: fitnessData.status,
-        health_metrics_raw: healthData.metrics,
-        health_sessions_raw: healthData.sessions,
-        fitness_raw: fitnessData.data
-      }
+      debug
     });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message, stack: err.stack });
+    return res.status(500).json({ error: err.message, debug });
   }
 }
