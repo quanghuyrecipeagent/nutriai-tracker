@@ -1076,7 +1076,13 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     try{
       const res=await fetch('/api/fitbit-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:fitbitToken.access_token,refresh_token:fitbitToken.refresh_token,date:dateStr||todayStr()})});
       const data=await res.json();
-      if(data.error){console.error('Fitbit sync error:',data.error);setFitbitSyncing(false);return;}
+      if(data.error){
+        console.error('Fitbit sync error:',data.error);
+        setFitbitDebug({error:data.error, details:data.details, raw:data});
+        setFitbitLastSync('Error: '+data.error);
+        setFitbitSyncing(false);
+        return;
+      }
 
       // Log debug info
       console.log('Fitbit sync result:',{steps:data.steps,calories:data.calories_burned,active_min:data.active_minutes,debug:data.debug});
@@ -1116,7 +1122,11 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
             : 'no activity recorded today')
         );
       }
-    }catch(err){console.error('Fitbit sync failed:',err);}
+    }catch(err){
+      console.error('Fitbit sync failed:',err);
+      setFitbitDebug({error:err.message});
+      setFitbitLastSync('Error: '+err.message);
+    }
     setFitbitSyncing(false);
   }
 
@@ -1736,13 +1746,16 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
               ),
               h('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:1.5}},'Steps, calories burned, and active minutes sync automatically each time you open the app. Appears as "Fitbit daily activity" in your log.'),
               fitbitDebug&&h('div',{style:{marginTop:'10px',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'9px',fontSize:'11px',color:'var(--text3)',lineHeight:1.6,wordBreak:'break-all'}},
-                h('div',{style:{color:'var(--text2)',fontWeight:600,marginBottom:'4px'}},'Debug info:'),
-                h('div',null,'Health metrics status: '+fitbitDebug.health_metrics_status),
-                h('div',null,'Health sessions status: '+fitbitDebug.health_sessions_status),
-                h('div',null,'Fitness API status: '+fitbitDebug.fitness_status),
-                h('div',{style:{marginTop:'4px',color:'var(--text2)'}},'Health metrics raw:'),
-                h('div',{style:{fontFamily:'monospace',fontSize:'10px',whiteSpace:'pre-wrap'}},JSON.stringify(fitbitDebug.health_metrics_raw,null,2)),
-                h('div',{style:{marginTop:'4px',color:'var(--text2)'}},'Fitness buckets: '+(fitbitDebug.fitness_raw?.bucket?.length||0))
+                h('div',{style:{color:fitbitDebug.error?'var(--danger)':'var(--text2)',fontWeight:600,marginBottom:'4px'}},fitbitDebug.error?'❌ Error:':'📊 Debug info:'),
+                fitbitDebug.error&&h('div',{style:{color:'var(--danger)',marginBottom:'4px'}},fitbitDebug.error),
+                fitbitDebug.health_metrics_status&&h('div',null,'Health metrics status: '+fitbitDebug.health_metrics_status),
+                fitbitDebug.health_sessions_status&&h('div',null,'Health sessions status: '+fitbitDebug.health_sessions_status),
+                fitbitDebug.fitness_status&&h('div',null,'Fitness API status: '+fitbitDebug.fitness_status),
+                fitbitDebug.health_metrics_raw&&h('div',null,
+                  h('div',{style:{color:'var(--text2)',marginTop:'4px'}},'Raw response:'),
+                  h('div',{style:{fontFamily:'monospace',fontSize:'10px',whiteSpace:'pre-wrap'}},JSON.stringify(fitbitDebug.health_metrics_raw,null,2))
+                ),
+                fitbitDebug.details&&h('div',{style:{fontFamily:'monospace',fontSize:'10px',whiteSpace:'pre-wrap',marginTop:'4px'}},JSON.stringify(fitbitDebug.details,null,2))
               )
             )
           : h('div',null,
