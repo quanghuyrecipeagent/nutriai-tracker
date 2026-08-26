@@ -436,7 +436,7 @@ function MealBarViz({entry,expanded,onToggle}) {
 }
 
 // ── Edit Meal Overlay ─────────────────────────────────────────
-function EditMealOverlay({entry,advancedMode,onSave,onDelete,onClose}) {
+function EditMealOverlay({entry,advancedMode,saveError,onSave,onDelete,onClose}) {
   const [form,setForm]=useState({
     name:entry.name||'',
     description:entry.description||'',
@@ -491,6 +491,7 @@ function EditMealOverlay({entry,advancedMode,onSave,onDelete,onClose}) {
           )
         )
       ),
+      saveError&&h('div',{style:{marginTop:'10px',padding:'8px 10px',background:'rgba(224,48,48,.1)',border:'1px solid rgba(224,48,48,.2)',borderRadius:'var(--radius-sm)',fontSize:'12px',color:'var(--danger)'}},'⚠ '+saveError),
       h('div',{style:{display:'flex',gap:'8px',marginTop:'16px',paddingTop:'14px',borderTop:'1px solid var(--border)'}},
         h('button',{className:'cbtn-no',style:{flex:1},onClick:onDelete},'Delete meal'),
         h('button',{className:'savebtn',style:{flex:2},onClick:save},'Save changes')
@@ -649,6 +650,10 @@ function App({user,onLogout}) {
   const [fitbitToken,setFitbitToken]=useState(null);   // {access_token, refresh_token, expires_at}
   const [fitbitSyncing,setFitbitSyncing]=useState(false);
   const [fitbitLastSync,setFitbitLastSync]=useState(null);
+  const [actForm,setActForm]=useState({name:'',duration_min:'',calories_burned:'',notes:''});
+  const [fpForm,setFpForm]=useState({height_cm:'',age:'',sex:'male',activity_level:'moderate'});
+  const [fpDirty,setFpDirty]=useState(false);
+  const [editSaveError,setEditSaveError]=useState('');
   // Input state
   const [inputMode,setInputMode]=useState('ai');
   const [aiText,setAiText]=useState('');
@@ -718,12 +723,9 @@ function App({user,onLogout}) {
 
       // Load fitness profile fields from profiles table
       if(prof){
-        setFitnessProfile({
-          height_cm:prof.height_cm||'',
-          age:prof.age||'',
-          sex:prof.sex||'male',
-          activity_level:prof.activity_level||'moderate'
-        });
+        const fp={height_cm:prof.height_cm||'',age:prof.age||'',sex:prof.sex||'male',activity_level:prof.activity_level||'moderate'};
+        setFitnessProfile(fp);
+        setFpForm(fp);
       }
       // Load Fitbit tokens
       const {data:ft}=await sb.from('fitbit_tokens').select('*').eq('user_id',user.id).single();
@@ -966,7 +968,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     setEditMacro(null);
   }
   async function updateFullMeal(date,id,updates){
-    // Only send columns that exist in food_entries — no updated_at unless confirmed
+    setEditSaveError('');
     const payload={
       name:updates.name,
       description:updates.description||'',
@@ -977,8 +979,21 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
       fiber:Math.round(updates.fiber||0),
       micros:updates.micros||{}
     };
-    const {error}=await sb.from('food_entries').update(payload).eq('id',id).eq('user_id',user.id);
-    if(error){console.error('updateFullMeal error:',error);return;}
+    // id can be string or number — try both match approaches
+    let q=sb.from('food_entries').update(payload).eq('user_id',user.id);
+    // Try numeric id first, fall back to string
+    if(!isNaN(Number(id))){q=q.eq('id',Number(id));}
+    else{q=q.eq('id',id);}
+    const {data:updated,error}=await q.select().single();
+    if(error){
+      console.error('updateFullMeal error:',error);
+      setEditSaveError('Save failed: '+error.message);
+      return;
+    }
+    if(!updated){
+      setEditSaveError('Save failed: entry not found — may be a permissions issue');
+      return;
+    }
     setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,...payload}:x)}));
     setEditingMeal(null);
   }
@@ -1564,9 +1579,6 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     const todayActs=activities[tod]||[];
     const todayBurned=todayActs.reduce((s,a)=>s+a.calories_burned,0);
     const tdee=calcTDEE();
-    const [actForm,setActForm]=useState({name:'',duration_min:'',calories_burned:'',notes:''});
-    const [fpForm,setFpForm]=useState({...fitnessProfile});
-    const [fpDirty,setFpDirty]=useState(false);
     const ACTIVITY_PRESETS=[
       {name:'Walking',metFactor:3.5},{name:'Running',metFactor:9.8},{name:'Cycling',metFactor:7.5},
       {name:'Weight training',metFactor:4.0},{name:'HIIT',metFactor:10.0},{name:'Swimming',metFactor:6.0},
@@ -1730,9 +1742,10 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     editingMeal&&h(EditMealOverlay,{
       entry:editingMeal.entry,
       advancedMode:settings.advancedMode,
+      saveError:editSaveError,
       onSave:updates=>updateFullMeal(editingMeal.date,editingMeal.entry.id,updates),
       onDelete:()=>deleteAndCloseEdit(editingMeal.date,editingMeal.entry.id),
-      onClose:()=>setEditingMeal(null)
+      onClose:()=>{setEditingMeal(null);setEditSaveError('');}
     }),
 
     pendingFood&&h('div',{className:'ov'},
