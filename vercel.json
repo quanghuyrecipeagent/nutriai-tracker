@@ -1,5 +1,10 @@
 {
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/claude.js": { "maxDuration": 30 },
+    "api/fitbit-callback.js": { "maxDuration": 10 },
+    "api/fitbit-sync.js": { "maxDuration": 30 }
+  }
 }
