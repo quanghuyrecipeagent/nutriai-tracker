@@ -650,6 +650,7 @@ function App({user,onLogout}) {
   const [fitbitToken,setFitbitToken]=useState(null);   // {access_token, refresh_token, expires_at}
   const [fitbitSyncing,setFitbitSyncing]=useState(false);
   const [fitbitLastSync,setFitbitLastSync]=useState(null);
+  const [fitbitDebug,setFitbitDebug]=useState(null);
   const [actForm,setActForm]=useState({name:'',duration_min:'',calories_burned:'',notes:''});
   const [fpForm,setFpForm]=useState({height_cm:'',age:'',sex:'male',activity_level:'moderate'});
   const [fpDirty,setFpDirty]=useState(false);
@@ -1079,6 +1080,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
 
       // Log debug info
       console.log('Fitbit sync result:',{steps:data.steps,calories:data.calories_burned,active_min:data.active_minutes,debug:data.debug});
+      setFitbitDebug(data.debug);
 
       // If token was refreshed, save the new one
       if(data.new_access_token){
@@ -1732,7 +1734,16 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
                 h('span',{style:{fontSize:'13px',color:'var(--text2)'}},'Connected via Google Health API'),
                 fitbitLastSync&&h('span',{style:{fontSize:'11px',color:'var(--text3)'}},'· last synced '+fitbitLastSync)
               ),
-              h('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:1.5}},'Steps, calories burned, and active minutes sync automatically each time you open the app. Appears as "Fitbit daily activity" in your log.')
+              h('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:1.5}},'Steps, calories burned, and active minutes sync automatically each time you open the app. Appears as "Fitbit daily activity" in your log.'),
+              fitbitDebug&&h('div',{style:{marginTop:'10px',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'9px',fontSize:'11px',color:'var(--text3)',lineHeight:1.6,wordBreak:'break-all'}},
+                h('div',{style:{color:'var(--text2)',fontWeight:600,marginBottom:'4px'}},'Debug info:'),
+                h('div',null,'Health metrics status: '+fitbitDebug.health_metrics_status),
+                h('div',null,'Health sessions status: '+fitbitDebug.health_sessions_status),
+                h('div',null,'Fitness API status: '+fitbitDebug.fitness_status),
+                h('div',{style:{marginTop:'4px',color:'var(--text2)'}},'Health metrics raw:'),
+                h('div',{style:{fontFamily:'monospace',fontSize:'10px',whiteSpace:'pre-wrap'}},JSON.stringify(fitbitDebug.health_metrics_raw,null,2)),
+                h('div',{style:{marginTop:'4px',color:'var(--text2)'}},'Fitness buckets: '+(fitbitDebug.fitness_raw?.bucket?.length||0))
+              )
             )
           : h('div',null,
               h('div',{style:{fontSize:'13px',color:'var(--text2)',lineHeight:1.6,marginBottom:'8px'}},'Connect your Fitbit account to automatically sync daily steps, calories burned, and active minutes into GRAMS.'),
