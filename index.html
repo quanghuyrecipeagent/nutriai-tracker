@@ -1054,7 +1054,13 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   function connectFitbit(){
     const clientId='782537530246-8j8tsf3rot20tg0mcr21ska30b4phauf.apps.googleusercontent.com';
     const redirectUri=encodeURIComponent('https://nutriai-tracker-kappa.vercel.app/api/fitbit-callback');
-    const scope=encodeURIComponent('https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.body.read');
+    // Google Fitness API scopes — covers steps, calories, active minutes from Fitbit
+    const scopes=[
+      'https://www.googleapis.com/auth/fitness.activity.read',
+      'https://www.googleapis.com/auth/fitness.body.read',
+      'https://www.googleapis.com/auth/fitness.heart_rate.read'
+    ];
+    const scope=encodeURIComponent(scopes.join(' '));
     const url=`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&access_type=offline&scope=${scope}&prompt=consent`;
     window.location.href=url;
   }

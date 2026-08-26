@@ -10,90 +10,98 @@ export default async function handler(req, res) {
 
   const targetDate = date || new Date().toISOString().split('T')[0];
 
+  async function refreshAccessToken() {
+    const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        refresh_token,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        grant_type: 'refresh_token'
+      })
+    });
+    return refreshRes.json();
+  }
+
+  async function fetchFitnessData(token) {
+    const startMs = new Date(targetDate + 'T00:00:00Z').getTime();
+    const endMs   = new Date(targetDate + 'T23:59:59Z').getTime();
+
+    const body = {
+      aggregateBy: [
+        { dataTypeName: 'com.google.step_count.delta'    },
+        { dataTypeName: 'com.google.calories.expended'   },
+        { dataTypeName: 'com.google.active_minutes'      },
+        { dataTypeName: 'com.google.heart_minutes'       }
+      ],
+      bucketByTime: { durationMillis: 86400000 },
+      startTimeMillis: startMs,
+      endTimeMillis:   endMs
+    };
+
+    const r = await fetch(
+      'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      }
+    );
+    return r;
+  }
+
   try {
-    // Try with current token first
     let token = access_token;
     let newRefreshToken = null;
 
-    // Fetch activity summary from Google Health / Fitbit
-    const fetchData = async (tok) => {
-      // Google Health API - daily activity aggregation
-      const endTime = `${targetDate}T23:59:59Z`;
-      const startTime = `${targetDate}T00:00:00Z`;
+    let response = await fetchFitnessData(token);
 
-      const response = await fetch(
-        `https://health.googleapis.com/v1/users/-/sessions?startTime=${startTime}&endTime=${endTime}`,
-        { headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' } }
-      );
-      return response;
-    };
-
-    let response = await fetchData(token);
-
-    // If 401, try refreshing the token
+    // Token expired — refresh it
     if (response.status === 401 && refresh_token) {
-      const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          refresh_token,
-          client_id: process.env.GOOGLE_CLIENT_ID,
-          client_secret: process.env.GOOGLE_CLIENT_SECRET,
-          grant_type: 'refresh_token'
-        })
-      });
-      const refreshData = await refreshRes.json();
-      if (refreshData.access_token) {
-        token = refreshData.access_token;
-        newRefreshToken = refreshData.refresh_token || refresh_token;
-        response = await fetchData(token);
-      } else {
+      const refreshed = await refreshAccessToken();
+      if (!refreshed.access_token) {
         return res.status(401).json({ error: 'Token expired — please reconnect Fitbit' });
       }
+      token = refreshed.access_token;
+      newRefreshToken = refreshed.refresh_token || refresh_token;
+      response = await fetchFitnessData(token);
     }
 
-    // Also fetch aggregated daily steps + calories
-    const aggRes = await fetch(
-      'https://health.googleapis.com/v1/users/-/dataset:aggregate',
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          aggregateBy: [
-            { dataTypeName: 'com.google.step_count.delta' },
-            { dataTypeName: 'com.google.calories.expended' },
-            { dataTypeName: 'com.google.active_minutes' }
-          ],
-          bucketByTime: { durationMillis: 86400000 },
-          startTimeMillis: new Date(`${targetDate}T00:00:00Z`).getTime(),
-          endTimeMillis: new Date(`${targetDate}T23:59:59Z`).getTime()
-        })
-      }
-    );
+    const data = await response.json();
 
-    const aggData = await aggRes.json();
-    let steps = 0, caloriesBurned = 0, activeMinutes = 0;
-
-    if (aggData.bucket && aggData.bucket.length > 0) {
-      aggData.bucket.forEach(bucket => {
-        (bucket.dataset || []).forEach(ds => {
-          (ds.point || []).forEach(point => {
-            const val = point.value?.[0];
-            if (!val) return;
-            if (ds.dataSourceId?.includes('step_count')) steps += val.intVal || 0;
-            if (ds.dataSourceId?.includes('calories')) caloriesBurned += Math.round(val.fpVal || 0);
-            if (ds.dataSourceId?.includes('active_minutes')) activeMinutes += val.intVal || 0;
-          });
-        });
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: data.error?.message || 'Google Fitness API error',
+        details: data
       });
     }
+
+    let steps = 0, caloriesBurned = 0, activeMinutes = 0;
+
+    (data.bucket || []).forEach(bucket => {
+      (bucket.dataset || []).forEach(ds => {
+        (ds.point || []).forEach(point => {
+          const val = point.value?.[0];
+          if (!val) return;
+          const src = ds.dataSourceId || '';
+          if (src.includes('step_count'))    steps         += (val.intVal  || 0);
+          if (src.includes('calories'))      caloriesBurned += Math.round(val.fpVal || 0);
+          if (src.includes('active_minutes'))activeMinutes  += (val.intVal  || 0);
+        });
+      });
+    });
 
     return res.json({
       date: targetDate,
       steps,
       calories_burned: caloriesBurned,
-      active_minutes: activeMinutes,
-      new_access_token: token !== access_token ? token : null,
+      active_minutes:  activeMinutes,
+      raw_bucket_count: (data.bucket || []).length,
+      new_access_token:  token !== access_token ? token : null,
       new_refresh_token: newRefreshToken
     });
 
