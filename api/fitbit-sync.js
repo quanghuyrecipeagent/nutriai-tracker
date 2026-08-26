@@ -26,87 +26,69 @@ export default async function handler(req, res) {
 
   let token = access_token;
   let newRefreshToken = null;
-  const debug = { attempts: [] };
-
-  // Helper to safely fetch and parse JSON
-  async function safeFetch(url, options = {}) {
-    const r = await fetch(url, options);
-    const text = await r.text();
-    debug.attempts.push({ url: url.substring(0, 80), status: r.status, preview: text.substring(0, 200) });
-    try {
-      return { status: r.status, data: JSON.parse(text) };
-    } catch(e) {
-      return { status: r.status, data: null, raw: text.substring(0, 300) };
-    }
-  }
 
   try {
-    // ── Try 1: Google Fitness API (most reliable) ──────────────
-    const startMs = new Date(targetDate + 'T00:00:00Z').getTime();
-    const endMs   = new Date(targetDate + 'T23:59:59Z').getTime();
+    // First check what data sources exist in this account
+    let sourcesRes = await fetch(
+      'https://www.googleapis.com/fitness/v1/users/me/dataSources',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-    let fit = await safeFetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        aggregateBy: [
-          { dataTypeName: 'com.google.step_count.delta' },
-          { dataTypeName: 'com.google.calories.expended' },
-          { dataTypeName: 'com.google.active_minutes' }
-        ],
-        bucketByTime: { durationMillis: 86400000 },
-        startTimeMillis: startMs,
-        endTimeMillis: endMs
-      })
-    });
-
-    // Token expired — refresh and retry
-    if (fit.status === 401 && refresh_token) {
+    // Refresh token if expired
+    if (sourcesRes.status === 401 && refresh_token) {
       const refreshed = await refreshToken();
       if (refreshed.access_token) {
         token = refreshed.access_token;
         newRefreshToken = refreshed.refresh_token || refresh_token;
-        fit = await safeFetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            aggregateBy: [
-              { dataTypeName: 'com.google.step_count.delta' },
-              { dataTypeName: 'com.google.calories.expended' },
-              { dataTypeName: 'com.google.active_minutes' }
-            ],
-            bucketByTime: { durationMillis: 86400000 },
-            startTimeMillis: startMs,
-            endTimeMillis: endMs
-          })
-        });
+        sourcesRes = await fetch(
+          'https://www.googleapis.com/fitness/v1/users/me/dataSources',
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
       }
     }
 
-    // ── Try 2: Google Health API ───────────────────────────────
-    const startTime = targetDate + 'T00:00:00Z';
-    const endTime   = targetDate + 'T23:59:59Z';
-    const health = await safeFetch(
-      `https://health.googleapis.com/v1/users/-/sessions?startTime=${startTime}&endTime=${endTime}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const sourcesData = await sourcesRes.json();
+    const allSources = (sourcesData.dataSource || []).map(s => s.dataStreamId);
+    const stepSources   = allSources.filter(s => s.includes('step'));
+    const calSources    = allSources.filter(s => s.includes('calori'));
+    const activeSources = allSources.filter(s => s.includes('active') || s.includes('activity'));
 
-    // Parse Google Fitness results
+    // Now fetch actual data
+    const startMs = new Date(targetDate + 'T00:00:00Z').getTime();
+    const endMs   = new Date(targetDate + 'T23:59:59Z').getTime();
+
+    const fitRes = await fetch(
+      'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          aggregateBy: [
+            { dataTypeName: 'com.google.step_count.delta' },
+            { dataTypeName: 'com.google.calories.expended' },
+            { dataTypeName: 'com.google.active_minutes' }
+          ],
+          bucketByTime: { durationMillis: 86400000 },
+          startTimeMillis: startMs,
+          endTimeMillis: endMs
+        })
+      }
+    );
+    const fitData = await fitRes.json();
+
     let steps = 0, caloriesBurned = 0, activeMinutes = 0;
-    if (fit.data?.bucket) {
-      fit.data.bucket.forEach(bucket => {
-        (bucket.dataset || []).forEach(ds => {
-          (ds.point || []).forEach(point => {
-            const val = point.value?.[0];
-            if (!val) return;
-            const src = ds.dataSourceId || '';
-            if (src.includes('step_count'))     steps          += (val.intVal || 0);
-            if (src.includes('calories'))       caloriesBurned += Math.round(val.fpVal || 0);
-            if (src.includes('active_minutes')) activeMinutes  += (val.intVal || 0);
-          });
+    (fitData.bucket || []).forEach(bucket => {
+      (bucket.dataset || []).forEach(ds => {
+        (ds.point || []).forEach(point => {
+          const val = point.value?.[0];
+          if (!val) return;
+          const src = ds.dataSourceId || '';
+          if (src.includes('step_count'))     steps          += (val.intVal  || 0);
+          if (src.includes('calories'))       caloriesBurned += Math.round(val.fpVal || 0);
+          if (src.includes('active_minutes')) activeMinutes  += (val.intVal  || 0);
         });
       });
-    }
+    });
 
     return res.json({
       date: targetDate,
@@ -115,10 +97,18 @@ export default async function handler(req, res) {
       active_minutes: activeMinutes,
       new_access_token: token !== access_token ? token : null,
       new_refresh_token: newRefreshToken,
-      debug
+      debug: {
+        total_sources: allSources.length,
+        step_sources: stepSources,
+        calorie_sources: calSources,
+        active_sources: activeSources,
+        all_sources: allSources,
+        fitness_status: fitRes.status,
+        bucket_count: (fitData.bucket || []).length
+      }
     });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message, debug });
+    return res.status(500).json({ error: err.message });
   }
 }
