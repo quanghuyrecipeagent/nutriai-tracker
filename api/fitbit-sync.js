@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const targetDate = date || new Date().toISOString().split('T')[0];
 
   async function refreshAccessToken() {
-    const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+    const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -21,37 +21,34 @@ export default async function handler(req, res) {
         grant_type: 'refresh_token'
       })
     });
-    return refreshRes.json();
+    return r.json();
   }
 
   async function fetchFitnessData(token) {
     const startMs = new Date(targetDate + 'T00:00:00Z').getTime();
     const endMs   = new Date(targetDate + 'T23:59:59Z').getTime();
+    return fetch('https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        aggregateBy: [
+          { dataTypeName: 'com.google.step_count.delta' },
+          { dataTypeName: 'com.google.calories.expended' },
+          { dataTypeName: 'com.google.active_minutes' }
+        ],
+        bucketByTime: { durationMillis: 86400000 },
+        startTimeMillis: startMs,
+        endTimeMillis: endMs
+      })
+    });
+  }
 
-    const body = {
-      aggregateBy: [
-        { dataTypeName: 'com.google.step_count.delta'    },
-        { dataTypeName: 'com.google.calories.expended'   },
-        { dataTypeName: 'com.google.active_minutes'      },
-        { dataTypeName: 'com.google.heart_minutes'       }
-      ],
-      bucketByTime: { durationMillis: 86400000 },
-      startTimeMillis: startMs,
-      endTimeMillis:   endMs
-    };
-
-    const r = await fetch(
-      'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-      }
-    );
-    return r;
+  // Also list available data sources so we can debug
+  async function listDataSources(token) {
+    const r = await fetch('https://www.googleapis.com/fitness/v1/users/me/dataSources', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    return r.json();
   }
 
   try {
@@ -60,7 +57,6 @@ export default async function handler(req, res) {
 
     let response = await fetchFitnessData(token);
 
-    // Token expired — refresh it
     if (response.status === 401 && refresh_token) {
       const refreshed = await refreshAccessToken();
       if (!refreshed.access_token) {
@@ -80,17 +76,20 @@ export default async function handler(req, res) {
       });
     }
 
-    let steps = 0, caloriesBurned = 0, activeMinutes = 0;
+    // Get data sources for debugging
+    const sources = await listDataSources(token);
+    const sourceList = (sources.dataSource || []).map(s => s.dataStreamId);
 
+    let steps = 0, caloriesBurned = 0, activeMinutes = 0;
     (data.bucket || []).forEach(bucket => {
       (bucket.dataset || []).forEach(ds => {
         (ds.point || []).forEach(point => {
           const val = point.value?.[0];
           if (!val) return;
           const src = ds.dataSourceId || '';
-          if (src.includes('step_count'))    steps         += (val.intVal  || 0);
-          if (src.includes('calories'))      caloriesBurned += Math.round(val.fpVal || 0);
-          if (src.includes('active_minutes'))activeMinutes  += (val.intVal  || 0);
+          if (src.includes('step_count'))     steps          += (val.intVal || 0);
+          if (src.includes('calories'))       caloriesBurned += Math.round(val.fpVal || 0);
+          if (src.includes('active_minutes')) activeMinutes  += (val.intVal || 0);
         });
       });
     });
@@ -99,9 +98,14 @@ export default async function handler(req, res) {
       date: targetDate,
       steps,
       calories_burned: caloriesBurned,
-      active_minutes:  activeMinutes,
-      raw_bucket_count: (data.bucket || []).length,
-      new_access_token:  token !== access_token ? token : null,
+      active_minutes: activeMinutes,
+      debug: {
+        bucket_count: (data.bucket || []).length,
+        data_sources_found: sourceList,
+        has_fitbit_source: sourceList.some(s => s.toLowerCase().includes('fitbit')),
+        raw_buckets: data.bucket || []
+      },
+      new_access_token: token !== access_token ? token : null,
       new_refresh_token: newRefreshToken
     });
 
