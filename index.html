@@ -979,19 +979,13 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
       fiber:Math.round(updates.fiber||0),
       micros:updates.micros||{}
     };
-    // id can be string or number — try both match approaches
-    let q=sb.from('food_entries').update(payload).eq('user_id',user.id);
-    // Try numeric id first, fall back to string
-    if(!isNaN(Number(id))){q=q.eq('id',Number(id));}
-    else{q=q.eq('id',id);}
-    const {data:updated,error}=await q.select().single();
+    const {error}=await sb.from('food_entries')
+      .update(payload)
+      .eq('user_id',user.id)
+      .eq('id', isNaN(Number(id))?id:Number(id));
     if(error){
       console.error('updateFullMeal error:',error);
       setEditSaveError('Save failed: '+error.message);
-      return;
-    }
-    if(!updated){
-      setEditSaveError('Save failed: entry not found — may be a permissions issue');
       return;
     }
     setEntries(p=>({...p,[date]:(p[date]||[]).map(x=>x.id===id?{...x,...payload}:x)}));
