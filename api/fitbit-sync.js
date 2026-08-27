@@ -26,69 +26,83 @@ export default async function handler(req, res) {
 
   let token = access_token;
   let newRefreshToken = null;
+  const debug = {};
 
-  try {
-    // First check what data sources exist in this account
-    let sourcesRes = await fetch(
-      'https://www.googleapis.com/fitness/v1/users/me/dataSources',
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    // Refresh token if expired
-    if (sourcesRes.status === 401 && refresh_token) {
+  async function tryRefreshIfNeeded(status) {
+    if (status === 401 && refresh_token) {
       const refreshed = await refreshToken();
       if (refreshed.access_token) {
         token = refreshed.access_token;
         newRefreshToken = refreshed.refresh_token || refresh_token;
-        sourcesRes = await fetch(
-          'https://www.googleapis.com/fitness/v1/users/me/dataSources',
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+        return true;
       }
     }
+    return false;
+  }
 
-    const sourcesData = await sourcesRes.json();
-    const allSources = (sourcesData.dataSource || []).map(s => s.dataStreamId);
-    const stepSources   = allSources.filter(s => s.includes('step'));
-    const calSources    = allSources.filter(s => s.includes('calori'));
-    const activeSources = allSources.filter(s => s.includes('active') || s.includes('activity'));
+  try {
+    const startTime = `${targetDate}T00:00:00Z`;
+    const endTime   = `${targetDate}T23:59:59Z`;
 
-    // Now fetch actual data
-    const startMs = new Date(targetDate + 'T00:00:00Z').getTime();
-    const endMs   = new Date(targetDate + 'T23:59:59Z').getTime();
+    // ── 1. Google Health API — activity_and_fitness scope ────────
+    // This is what the Google Health app uses on iPhone
+    let healthRes = await fetch(
+      `https://health.googleapis.com/v1/users/-/sessions?startTime=${startTime}&endTime=${endTime}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (healthRes.status === 401) {
+      await tryRefreshIfNeeded(401);
+      healthRes = await fetch(
+        `https://health.googleapis.com/v1/users/-/sessions?startTime=${startTime}&endTime=${endTime}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    }
+    const healthText = await healthRes.text();
+    debug.health_sessions_status = healthRes.status;
+    try { debug.health_sessions = JSON.parse(healthText); } catch(e) { debug.health_sessions_raw = healthText.slice(0,300); }
 
-    const fitRes = await fetch(
-      'https://www.googleapis.com/fitness/v1/users/me/dataset:aggregate',
+    // ── 2. Google Health API — aggregate metrics ─────────────────
+    let metricsRes = await fetch(
+      'https://health.googleapis.com/v1/users/-:aggregateMetrics',
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          aggregateBy: [
-            { dataTypeName: 'com.google.step_count.delta' },
-            { dataTypeName: 'com.google.calories.expended' },
-            { dataTypeName: 'com.google.active_minutes' }
+          aggregations: [
+            { metricType: 'STEPS' },
+            { metricType: 'CALORIES_BURNED' },
+            { metricType: 'ACTIVE_DURATION' },
+            { metricType: 'DISTANCE' }
           ],
-          bucketByTime: { durationMillis: 86400000 },
-          startTimeMillis: startMs,
-          endTimeMillis: endMs
+          timeRange: { startTime, endTime }
         })
       }
     );
-    const fitData = await fitRes.json();
+    const metricsText = await metricsRes.text();
+    debug.metrics_status = metricsRes.status;
+    try { debug.metrics = JSON.parse(metricsText); } catch(e) { debug.metrics_raw = metricsText.slice(0,300); }
 
+    // ── 3. Google Health API — list available metric types ───────
+    let typesRes = await fetch(
+      'https://health.googleapis.com/v1/users/-/metricTypes',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    const typesText = await typesRes.text();
+    debug.types_status = typesRes.status;
+    try { debug.metric_types = JSON.parse(typesText); } catch(e) { debug.types_raw = typesText.slice(0,500); }
+
+    // Parse whatever we got
     let steps = 0, caloriesBurned = 0, activeMinutes = 0;
-    (fitData.bucket || []).forEach(bucket => {
-      (bucket.dataset || []).forEach(ds => {
-        (ds.point || []).forEach(point => {
-          const val = point.value?.[0];
-          if (!val) return;
-          const src = ds.dataSourceId || '';
-          if (src.includes('step_count'))     steps          += (val.intVal  || 0);
-          if (src.includes('calories'))       caloriesBurned += Math.round(val.fpVal || 0);
-          if (src.includes('active_minutes')) activeMinutes  += (val.intVal  || 0);
-        });
+
+    // Try parsing metrics response
+    const metricsData = debug.metrics;
+    if (metricsData?.aggregations) {
+      metricsData.aggregations.forEach(agg => {
+        if (agg.metricType === 'STEPS') steps = Math.round(agg.value || 0);
+        if (agg.metricType === 'CALORIES_BURNED') caloriesBurned = Math.round(agg.value || 0);
+        if (agg.metricType === 'ACTIVE_DURATION') activeMinutes = Math.round((agg.value || 0) / 60);
       });
-    });
+    }
 
     return res.json({
       date: targetDate,
@@ -97,18 +111,10 @@ export default async function handler(req, res) {
       active_minutes: activeMinutes,
       new_access_token: token !== access_token ? token : null,
       new_refresh_token: newRefreshToken,
-      debug: {
-        total_sources: allSources.length,
-        step_sources: stepSources,
-        calorie_sources: calSources,
-        active_sources: activeSources,
-        all_sources: allSources,
-        fitness_status: fitRes.status,
-        bucket_count: (fitData.bucket || []).length
-      }
+      debug
     });
 
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, stack: err.stack?.slice(0,300) });
   }
 }
