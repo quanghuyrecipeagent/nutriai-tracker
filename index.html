@@ -660,6 +660,14 @@ function App({user,onLogout}) {
   const [showElectrolyteForm,setShowElectrolyteForm]=useState(false);
   const [eForm,setEForm]=useState({name:'',brand:'',serving_size:'1',serving_unit:'serving',calories:'0',protein:'0',carbs:'0',fat:'0',sodium_mg:'0',potassium_mg:'0',magnesium_mg:'0',notes:''});
   const [showElectrolyteLib,setShowElectrolyteLib]=useState(false);
+  const [customMl,setCustomMl]=useState('');
+  const [selElectrolyte,setSelElectrolyte]=useState(null);
+  const [eServings,setEServings]=useState('1');
+  const [hsLocal,setHsLocal]=useState({goal_ml:3785,unit:'oz',notify_start:'08:00',notify_end:'22:00',notify_min:60,notify_on:false});
+  const [selBeverage,setSelBeverage]=useState(null); // custom beverage selection
+  const [beverageLibrary,setBeverageLibrary]=useState([]); // saved beverages
+  const [showBevForm,setShowBevForm]=useState(false);
+  const [bevForm,setBevForm]=useState({name:'',calories_per_100ml:'0',protein_per_100ml:'0',carbs_per_100ml:'0',fat_per_100ml:'0'});
   const [editSaveError,setEditSaveError]=useState('');
   // Input state
   const [inputMode,setInputMode]=useState('ai');
@@ -734,14 +742,9 @@ function App({user,onLogout}) {
 
       // Load hydration settings from profile
       if(prof){
-        setHydrationSettings({
-          goal_ml:prof.hydration_goal_ml||3785,
-          unit:prof.hydration_unit||'oz',
-          notify_start:prof.hydration_notify_start||'08:00',
-          notify_end:prof.hydration_notify_end||'22:00',
-          notify_min:prof.hydration_notify_min||60,
-          notify_on:prof.hydration_notify_on||false
-        });
+        const hs={goal_ml:prof.hydration_goal_ml||3785,unit:prof.hydration_unit||'oz',notify_start:prof.hydration_notify_start||'08:00',notify_end:prof.hydration_notify_end||'22:00',notify_min:prof.hydration_notify_min||60,notify_on:prof.hydration_notify_on||false};
+        setHydrationSettings(hs);
+        setHsLocal(hs);
       }
 
       // Check notification permission
@@ -1544,64 +1547,114 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     const todayMl=todayLogs.reduce((s,x)=>s+(x.amount_ml||0),0);
     const goalMl=hydrationSettings.goal_ml||3785;
     const pct=Math.min(100,(todayMl/goalMl)*100);
-    const remaining=Math.max(0,goalMl-todayMl);
-    const QUICK=[{label:'8 oz',ml:237},{label:'12 oz',ml:355},{label:'16 oz',ml:473},{label:'32 oz',ml:946},{label:'1 L',ml:1000},{label:'Custom',ml:0}];
-    const UNITS_OPTS=[{v:'oz',l:'oz (fluid ounces)'},{v:'ml',l:'ml (millilitres)'},{v:'L',l:'L (litres)'},{v:'gal',l:'gal (gallons)'}];
-    const GOAL_PRESETS=[{label:'Half gallon',ml:1893},{label:'1 gallon',ml:3785},{label:'2 L',ml:2000},{label:'3 L',ml:3000},{label:'100 oz',ml:2957}];
-    const INTERVALS=[{label:'30 min',min:30},{label:'1 hr',min:60},{label:'1.5 hr',min:90},{label:'2 hr',min:120},{label:'3 hr',min:180}];
-    const [customMl,setCustomMl]=useState('');
-    const [selElectrolyte,setSelElectrolyte]=useState(null);
-    const [eServings,setEServings]=useState('1');
-    const [hsLocal,setHsLocal]=useState({...hydrationSettings});
 
-    // How much to drink each interval to hit goal
-    const notifyCount=hydrationSettings.notify_on&&hydrationSettings.notify_min>0?(()=>{
+    const QUICK_OZ=[{label:'8 oz',ml:237},{label:'12 oz',ml:355},{label:'16 oz',ml:473},{label:'16.9 oz',ml:500},{label:'32 oz',ml:946}];
+    const UNITS_OPTS=[{v:'oz',l:'fl oz'},{v:'ml',l:'ml'},{v:'L',l:'litres'},{v:'gal',l:'gallons'}];
+    const GOAL_PRESETS=[{label:'Half gal',ml:1893},{label:'1 gallon',ml:3785},{label:'2 L',ml:2000},{label:'3 L',ml:3000},{label:'100 oz',ml:2957}];
+
+    // Common beverages with macros per 100ml
+    const COMMON_BEVS=[
+      {name:'Water',cal:0,p:0,c:0,f:0,icon:'💧'},
+      {name:'Orange juice',cal:45,p:0.7,c:10.4,f:0.2,icon:'🍊'},
+      {name:'Whole milk',cal:61,p:3.2,c:4.8,f:3.3,icon:'🥛'},
+      {name:'2% milk',cal:50,p:3.3,c:4.9,f:2.0,icon:'🥛'},
+      {name:'Almond milk',cal:15,p:0.6,c:0.6,f:1.2,icon:'🥛'},
+      {name:'Apple juice',cal:46,p:0.1,c:11.3,f:0.1,icon:'🍎'},
+      {name:'Coconut water',cal:19,p:0.7,c:3.7,f:0.2,icon:'🥥'},
+      {name:'Sports drink',cal:25,p:0,c:6,f:0,icon:'⚡'},
+      {name:'Coffee',cal:2,p:0.3,c:0,f:0,icon:'☕'},
+      {name:'Green tea',cal:1,p:0,c:0,f:0,icon:'🍵'},
+    ];
+
+    const activeBev=selBeverage||COMMON_BEVS[0];
+
+    function getMacrosForLog(ml,bev){
+      if(!bev||bev.cal===0)return null;
+      const factor=ml/100;
+      return {calories:Math.round(bev.cal*factor),protein:Math.round(bev.p*factor*10)/10,carbs:Math.round(bev.c*factor*10)/10,fat:Math.round(bev.f*factor*10)/10};
+    }
+
+    async function doLog(ml){
+      if(!ml||ml<=0)return;
+      // Log the water/beverage
+      const tod=todayStr();
+      const el=selElectrolyte;
+      const servings=parseFloat(eServings)||1;
+      const row={user_id:user.id,logged_date:tod,logged_at:new Date().toISOString(),amount_ml:Math.round(ml),electrolyte_id:el?.id||null,electrolyte_servings:el?servings:0,notes:activeBev.name!=='Water'?activeBev.name:''};
+      const {data:ins,error}=await sb.from('hydration_logs').insert(row).select().single();
+      if(error){console.error('logWater:',error);return;}
+      if(ins)setHydrationLogs(p=>({...p,[tod]:[...(p[tod]||[]),ins]}));
+
+      // Add macros to food log if non-water beverage
+      const macros=getMacrosForLog(ml,activeBev);
+      if(macros&&macros.calories>0){
+        await saveEntry({name:activeBev.icon+' '+activeBev.name+' ('+Math.round(mlToDisplay(ml))+' '+hydUnit+')',calories:macros.calories,protein:macros.protein,carbs:macros.carbs,fat:macros.fat,fiber:0,micros:{}});
+      }
+
+      // Add electrolyte macros
+      if(el&&servings>0&&(el.calories>0||el.protein>0||el.carbs>0)){
+        await saveEntry({name:el.name+(el.brand?' ('+el.brand+')':''),calories:Math.round((el.calories||0)*servings),protein:Math.round((el.protein||0)*servings),carbs:Math.round((el.carbs||0)*servings),fat:Math.round((el.fat||0)*servings),fiber:0,micros:{sodium:Math.round((el.sodium_mg||0)*servings),potassium:Math.round((el.potassium_mg||0)*servings),magnesium:Math.round((el.magnesium_mg||0)*servings)}});
+        await sb.from('electrolytes').update({use_count:el.use_count+1}).eq('id',el.id);
+        setElectrolytes(p=>p.map(e=>e.id===el.id?{...e,use_count:e.use_count+1}:p).sort((a,b)=>b.use_count-a.use_count));
+      }
+      setCustomMl('');
+    }
+
+    const notifyTip=hydrationSettings.notify_on&&hydrationSettings.notify_min>0?(()=>{
       const [sh,sm]=hydrationSettings.notify_start.split(':').map(Number);
       const [eh,em]=hydrationSettings.notify_end.split(':').map(Number);
       const windowMin=(eh*60+em)-(sh*60+sm);
-      const intervals=Math.floor(windowMin/hydrationSettings.notify_min)||1;
-      return {intervals,perInterval:Math.round(mlToDisplay(goalMl/intervals)*10)/10};
+      const intervals=Math.max(1,Math.floor(windowMin/hydrationSettings.notify_min));
+      return Math.round(mlToDisplay(goalMl/intervals)*10)/10;
     })():null;
 
     return h('div',null,
       h('h1',{className:'stitle'},'Hydration 💧'),
 
-      // Progress card
+      // Progress
       h('div',{className:'card'},
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
           h('div',{className:'ctitle',style:{margin:0}},'Today'),
           h('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'22px',color:pct>=100?'#54b4e0':'var(--accent)'}},mlToDisplay(todayMl)+' '+hydUnit)
         ),
-        h('div',{className:'pbar',style:{height:'10px',borderRadius:'5px'}},
-          h('div',{className:'pfill',style:{width:pct+'%',background:pct>=100?'#54b4e0':'linear-gradient(90deg,#54b4e0,#7ce8ff)',borderRadius:'5px'}})
+        h('div',{className:'pbar',style:{height:'10px',borderRadius:'5px',marginBottom:'8px'}},
+          h('div',{className:'pfill',style:{width:pct+'%',background:pct>=100?'#54b4e0':'#4db8d4',borderRadius:'5px'}})
         ),
-        h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'8px',fontSize:'12px',color:'var(--text2)'}},
-          h('span',null,pct>=100?'🎉 Goal reached!':mlToDisplay(remaining)+' '+hydUnit+' remaining'),
+        h('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'12px',color:'var(--text2)'}},
+          h('span',null,pct>=100?'🎉 Goal reached!':mlToDisplay(Math.max(0,goalMl-todayMl))+' '+hydUnit+' to go'),
           h('span',null,mlToDisplay(goalMl)+' '+hydUnit+' goal')
         ),
-        notifyCount&&h('div',{style:{marginTop:'10px',background:'rgba(84,180,224,.1)',border:'1px solid rgba(84,180,224,.2)',borderRadius:'var(--radius-sm)',padding:'8px 10px',fontSize:'12px',color:'#54b4e0'}},'💡 Drink ~'+notifyCount.perInterval+' '+hydUnit+' every '+hydrationSettings.notify_min+' min to hit your goal')
+        notifyTip&&h('div',{style:{marginTop:'10px',background:'rgba(77,184,212,.1)',border:'1px solid rgba(77,184,212,.25)',borderRadius:'var(--radius-sm)',padding:'8px 10px',fontSize:'12px',color:'#4db8d4'}},'💡 Drink ~'+notifyTip+' '+hydUnit+' every '+hydrationSettings.notify_min+' min to hit your goal')
       ),
 
-      // Quick log
+      // Beverage selector
       h('div',{className:'card'},
-        h('div',{className:'ctitle'},'Log water'),
+        h('div',{className:'ctitle'},'What are you drinking?'),
         h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'10px'}},
-          QUICK.map(q=>h('button',{key:q.label,onClick:()=>{if(q.ml>0){logWater(q.ml,selElectrolyte,selElectrolyte?parseFloat(eServings)||1:0);}},style:{padding:'7px 12px',background:q.ml>0?'var(--surface2)':'var(--accent-dim)',border:'1px solid '+(q.ml>0?'var(--border)':'rgba(255,107,26,.3)'),borderRadius:'20px',fontSize:'12px',color:q.ml>0?'var(--text2)':'var(--accent)',cursor:'pointer',transition:'all .15s',fontWeight:500}},q.label))
+          COMMON_BEVS.map(bev=>h('button',{key:bev.name,onClick:()=>setSelBeverage(bev),style:{padding:'6px 11px',background:activeBev.name===bev.name?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+(activeBev.name===bev.name?'rgba(255,107,26,.35)':'var(--border)'),borderRadius:'20px',fontSize:'12px',color:activeBev.name===bev.name?'var(--accent)':'var(--text2)',cursor:'pointer',transition:'all .15s',fontWeight:activeBev.name===bev.name?600:400}},bev.icon+' '+bev.name))
         ),
-        // Custom amount
-        h('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',alignItems:'center'}},
-          h('input',{type:'number',placeholder:'Custom amount',value:customMl,onChange:e=>setCustomMl(e.target.value),style:{flex:1,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none'}}),
+        activeBev.name!=='Water'&&h('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'8px',background:'var(--surface2)',borderRadius:'var(--radius-sm)',padding:'6px 10px'}},
+          'Macros per 100ml: '+activeBev.cal+' kcal · '+activeBev.p+'g P · '+activeBev.c+'g C · '+activeBev.f+'g F · Will be added to your food log'
+        ),
+
+        h('div',{className:'ctitle',style:{marginTop:'12px'}},'Quick log'),
+        h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}},
+          QUICK_OZ.map(q=>h('button',{key:q.label,onClick:()=>doLog(q.ml),style:{padding:'7px 12px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'20px',fontSize:'12px',color:'var(--text2)',cursor:'pointer',transition:'all .15s',fontWeight:500}},q.label))
+        ),
+        h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'10px'}},
+          h('input',{type:'number',placeholder:'Custom amount',value:customMl,onChange:e=>setCustomMl(e.target.value),onKeyDown:e=>{if(e.key==='Enter')doLog(displayToMl(parseFloat(customMl)));},style:{flex:1,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none'}}),
           h('span',{style:{fontSize:'12px',color:'var(--text3)',flexShrink:0}},hydUnit),
-          h('button',{className:'savebtn',style:{padding:'7px 14px',fontSize:'12px'},onClick:()=>{if(customMl){logWater(displayToMl(parseFloat(customMl)),selElectrolyte,selElectrolyte?parseFloat(eServings)||1:0);setCustomMl('');}}},'+')
+          h('button',{className:'savebtn',style:{padding:'7px 14px',fontSize:'12px'},onClick:()=>{if(customMl)doLog(displayToMl(parseFloat(customMl)));}},'+')
         ),
-        // Electrolyte with water
+
+        // Electrolyte add-on
         electrolytes.length>0&&h('div',null,
-          h('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'6px'}},'Add electrolyte to this drink (optional):'),
+          h('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'6px'}},'⚡ Add electrolyte (optional):'),
           h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'6px'}},
-            h('button',{onClick:()=>setSelElectrolyte(null),style:{padding:'4px 10px',background:!selElectrolyte?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+((!selElectrolyte)?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'11px',color:(!selElectrolyte)?'var(--accent)':'var(--text3)',cursor:'pointer'}},'None'),
+            h('button',{onClick:()=>setSelElectrolyte(null),style:{padding:'4px 10px',background:!selElectrolyte?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+(!selElectrolyte?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'11px',color:!selElectrolyte?'var(--accent)':'var(--text3)',cursor:'pointer'}},'None'),
             electrolytes.map(e=>h('button',{key:e.id,onClick:()=>setSelElectrolyte(e),style:{padding:'4px 10px',background:selElectrolyte?.id===e.id?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+(selElectrolyte?.id===e.id?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'11px',color:selElectrolyte?.id===e.id?'var(--accent)':'var(--text3)',cursor:'pointer'}},e.name))
           ),
-          selElectrolyte&&h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'6px'}},
+          selElectrolyte&&h('div',{style:{display:'flex',gap:'6px',alignItems:'center'}},
             h('span',{style:{fontSize:'11px',color:'var(--text3)'}},'Servings:'),
             h('input',{type:'number',min:'0.25',step:'0.25',value:eServings,onChange:e=>setEServings(e.target.value),style:{width:'70px',background:'var(--surface2)',border:'1px solid var(--accent)',borderRadius:'5px',padding:'4px 8px',color:'var(--text)',fontSize:'13px',outline:'none',textAlign:'center'}}),
             selElectrolyte.calories>0&&h('span',{style:{fontSize:'11px',color:'var(--accent)'}},'+'+Math.round(selElectrolyte.calories*(parseFloat(eServings)||1))+' kcal')
@@ -1609,19 +1662,21 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
         )
       ),
 
-      // Today's log
+      // Today log
       h('div',{className:'card'},
-        h('div',{className:'ctitle'},"Today's intake"),
-        todayLogs.length===0&&h('div',{className:'empty',style:{padding:'16px 0'}},h('div',{className:'eico'},'💧'),'Nothing logged yet'),
+        h('div',{className:'ctitle'},"Today's log"),
+        todayLogs.length===0&&h('div',{className:'empty',style:{padding:'14px 0'}},h('div',{className:'eico'},'💧'),'Nothing logged yet'),
         todayLogs.map(log=>{
           const el=electrolytes.find(e=>e.id===log.electrolyte_id);
           return h('div',{key:log.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderTop:'1px solid var(--border)'}},
             h('div',null,
-              h('div',{style:{fontSize:'13px',fontWeight:500,color:'#54b4e0'}},mlToDisplay(log.amount_ml)+' '+hydUnit),
-              el&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'+ '+el.name+(log.electrolyte_servings?' ×'+log.electrolyte_servings:''))
+              h('div',{style:{fontSize:'13px',fontWeight:500,color:'#4db8d4'}},
+                (log.notes?log.notes+' · ':'')+mlToDisplay(log.amount_ml)+' '+hydUnit
+              ),
+              el&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'⚡ '+el.name+(log.electrolyte_servings?' ×'+log.electrolyte_servings:''))
             ),
             h('div',{style:{display:'flex',gap:'7px',alignItems:'center'}},
-              h('span',{style:{fontSize:'11px',color:'var(--text3)'}},(new Date(log.logged_at)).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})),
+              h('span',{style:{fontSize:'11px',color:'var(--text3)'}},new Date(log.logged_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})),
               h('button',{onClick:()=>deleteHydrationLog(tod,log.id),style:{fontSize:'11px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
             )
           );
@@ -1635,94 +1690,90 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
           h('button',{className:'savebtn',style:{fontSize:'12px',padding:'6px 12px'},onClick:()=>setShowElectrolyteForm(p=>!p)},showElectrolyteForm?'Cancel':'+ Add')
         ),
         showElectrolyteForm&&h('div',{style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'12px',marginBottom:'12px'}},
-          h('div',{className:'g2',style:{gap:'7px',marginBottom:'7px'}},
-            [['name','Brand/Product name'],['brand','Brand (optional)']].map(([k,lbl])=>
-              h('div',{key:k,className:'mf'},h('label',null,lbl),h('input',{type:'text',value:eForm[k],onChange:e=>setEForm(p=>({...p,[k]:e.target.value}))}))
-            )
+          h('div',{className:'ov-grid',style:{marginBottom:'7px'}},
+            [['name','Product name *'],['brand','Brand']].map(([k,lbl])=>h('div',{key:k,className:'mf'},h('label',null,lbl),h('input',{type:'text',value:eForm[k],onChange:e=>setEForm(p=>({...p,[k]:e.target.value}))})))
           ),
-          h('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:'6px'}},'Per serving macros'),
+          h('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:'6px'}},'Macros per serving'),
           h('div',{className:'ov-grid',style:{marginBottom:'7px'}},
             [['serving_size','Serving size'],['calories','Calories'],['protein','Protein (g)'],['carbs','Carbs (g)'],['fat','Fat (g)'],['sodium_mg','Sodium (mg)'],['potassium_mg','Potassium (mg)'],['magnesium_mg','Magnesium (mg)']].map(([k,lbl])=>
               h('div',{key:k,className:'mf'},h('label',null,lbl),h('input',{type:'number',value:eForm[k],onChange:e=>setEForm(p=>({...p,[k]:e.target.value}))}))
             )
           ),
           h('div',{className:'mf',style:{marginBottom:'8px'}},
-            h('label',null,'Serving unit'),
+            h('label',null,'Unit'),
             h('select',{value:eForm.serving_unit,onChange:e=>setEForm(p=>({...p,serving_unit:e.target.value})),style:{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'5px',padding:'5px 8px',color:'var(--text)',fontSize:'12px',outline:'none',width:'100%'}},
               ['serving','scoop','packet','tablet','capsule','ml','oz'].map(u=>h('option',{key:u,value:u},u))
             )
           ),
           h('button',{className:'add-btn',onClick:()=>saveElectrolyte(eForm),disabled:!eForm.name.trim()},'Save electrolyte')
         ),
-        electrolytes.length===0&&!showElectrolyteForm&&h('div',{className:'empty',style:{padding:'14px 0'}},h('div',{className:'eico',style:{fontSize:'22px'}},'⚡'),'No electrolytes saved'),
+        electrolytes.length===0&&!showElectrolyteForm&&h('div',{className:'empty',style:{padding:'14px 0'}},h('div',{className:'eico',style:{fontSize:'22px'}},'⚡'),'No electrolytes saved — add LMNT, Liquid IV, etc.'),
         electrolytes.map(e=>h('div',{key:e.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid var(--border)'}},
           h('div',{style:{flex:1,minWidth:0}},
             h('div',{style:{fontSize:'13px',fontWeight:500}},e.name),
-            e.brand&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'Brand: '+e.brand),
+            e.brand&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'by '+e.brand),
             h('div',{style:{display:'flex',gap:'5px',marginTop:'3px',flexWrap:'wrap'}},
               e.calories>0&&h('span',{className:'mp cal'},e.calories+' kcal'),
-              e.sodium_mg>0&&h('span',{className:'mp',style:{background:'rgba(84,180,224,.12)',color:'#54b4e0'}},'Na '+e.sodium_mg+'mg'),
+              e.sodium_mg>0&&h('span',{className:'mp',style:{background:'rgba(77,184,212,.12)',color:'#4db8d4'}},'Na '+e.sodium_mg+'mg'),
               e.potassium_mg>0&&h('span',{className:'mp',style:{background:'rgba(84,224,168,.12)',color:'#54e0a8'}},'K '+e.potassium_mg+'mg'),
-              e.use_count>0&&h('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 4px'}},'×'+e.use_count)
+              e.use_count>0&&h('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 4px'}},'×'+e.use_count+' used')
             )
           ),
           h('button',{onClick:()=>deleteElectrolyte(e.id),style:{fontSize:'11px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none',flexShrink:0,marginLeft:'8px'},onMouseEnter:x=>x.target.style.color='var(--danger)',onMouseLeave:x=>x.target.style.color='var(--text3)'},'✕')
         ))
       ),
 
-      // Notification settings
+      // Settings & notifications
       h('div',{className:'card'},
-        h('div',{className:'ctitle'},'🔔 Hydration reminders'),
-        h('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'12px',lineHeight:1.5}},'Get notified to drink water throughout the day. Add GRAMS to your home screen for background notifications.'),
-        notifyPermission!=='granted'&&h('button',{className:'savebtn',style:{marginBottom:'12px',width:'100%'},onClick:async()=>{const p=await requestNotifyPermission();if(p==='granted'){const hs={...hsLocal,notify_on:true};setHsLocal(hs);saveHydrationSettings(hs);}}},'Allow notifications'),
-        notifyPermission==='granted'&&h('div',null,
-          h('div',{className:'tog-row',style:{marginBottom:'8px'}},
-            h('div',null,h('div',{className:'toglbl'},'Hydration reminders'),h('div',{className:'togdesc'},'Notify me to drink water')),
-            h('div',{className:'tog'+(hsLocal.notify_on?' on':''),onClick:()=>{const hs={...hsLocal,notify_on:!hsLocal.notify_on};setHsLocal(hs);saveHydrationSettings(hs);}})
-          ),
-          hsLocal.notify_on&&h('div',null,
-            h('div',{className:'g2',style:{gap:'8px',marginBottom:'8px'}},
-              h('div',{className:'grow',style:{marginBottom:0}},
-                h('label',null,'Start time'),
-                h('input',{type:'time',value:hsLocal.notify_start,onChange:e=>{setHsLocal(p=>({...p,notify_start:e.target.value}));setHydrationSettingsDirty(true);}})
-              ),
-              h('div',{className:'grow',style:{marginBottom:0}},
-                h('label',null,'End time'),
-                h('input',{type:'time',value:hsLocal.notify_end,onChange:e=>{setHsLocal(p=>({...p,notify_end:e.target.value}));setHydrationSettingsDirty(true);}})
-              )
-            ),
-            h('div',{className:'ctitle',style:{marginBottom:'7px'}},'Remind me every:'),
-            h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'10px'}},
-              [{l:'30 min',m:30},{l:'1 hr',m:60},{l:'1.5 hr',m:90},{l:'2 hr',m:120},{l:'3 hr',m:180}].map(({l,m})=>
-                h('button',{key:m,onClick:()=>{setHsLocal(p=>({...p,notify_min:m}));setHydrationSettingsDirty(true);},style:{padding:'6px 12px',background:hsLocal.notify_min===m?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+(hsLocal.notify_min===m?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'12px',color:hsLocal.notify_min===m?'var(--accent)':'var(--text2)',cursor:'pointer',fontWeight:500}},l)
-              )
-            ),
-            hydrationSettingsDirty&&h('button',{className:'savebtn',onClick:()=>saveHydrationSettings(hsLocal)},'Save reminder settings')
-          )
-        ),
-
-        // Goal & unit settings
-        h('div',{style:{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}}),
-        h('div',{className:'ctitle'},'Goal & units'),
+        h('div',{className:'ctitle'},'⚙️ Settings & reminders'),
+        h('div',{className:'ctitle',style:{marginBottom:'7px'}},'Units & goal'),
         h('div',{className:'g2',style:{gap:'8px',marginBottom:'8px'}},
           h('div',{className:'grow',style:{marginBottom:0}},
             h('label',null,'Display unit'),
-            h('select',{value:hsLocal.unit,onChange:e=>{setHsLocal(p=>({...p,unit:e.target.value}));setHydrationSettingsDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}},
+            h('select',{value:hsLocal.unit,onChange:e=>{const hs={...hsLocal,unit:e.target.value};setHsLocal(hs);saveHydrationSettings(hs);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}},
               UNITS_OPTS.map(({v,l})=>h('option',{key:v,value:v},l))
             )
           ),
           h('div',{className:'grow',style:{marginBottom:0}},
-            h('label',null,'Daily goal'),
+            h('label',null,'Daily goal ('+hydUnit+')'),
             h('input',{type:'number',value:Math.round(mlToDisplay(hsLocal.goal_ml)*10)/10,onChange:e=>{setHsLocal(p=>({...p,goal_ml:displayToMl(parseFloat(e.target.value)||0)}));setHydrationSettingsDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}})
           )
         ),
-        h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}},
-          GOAL_PRESETS.map(({label,ml})=>h('button',{key:label,onClick:()=>{setHsLocal(p=>({...p,goal_ml:ml}));setHydrationSettingsDirty(true);},style:{padding:'4px 10px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'20px',fontSize:'11px',color:'var(--text2)',cursor:'pointer'}},label))
+        h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'12px'}},
+          [{label:'Half gal',ml:1893},{label:'1 gallon',ml:3785},{label:'2 L',ml:2000},{label:'3 L',ml:3000},{label:'100 oz',ml:2957}].map(({label,ml})=>
+            h('button',{key:label,onClick:()=>{const hs={...hsLocal,goal_ml:ml};setHsLocal(hs);saveHydrationSettings(hs);},style:{padding:'4px 10px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'20px',fontSize:'11px',color:'var(--text2)',cursor:'pointer'}},label)
+          )
         ),
-        hydrationSettingsDirty&&h('button',{className:'savebtn',onClick:()=>saveHydrationSettings(hsLocal)},'Save settings')
+        h('div',{style:{borderTop:'1px solid var(--border)',paddingTop:'12px'}}),
+        h('div',{className:'ctitle',style:{marginBottom:'8px'}},'🔔 Reminders'),
+        notifyPermission!=='granted'
+          ?h('div',null,
+              h('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'10px',lineHeight:1.5}},'Get notified to drink water. On iPhone, add GRAMS to your Home Screen first (Share → Add to Home Screen), then allow notifications.'),
+              h('button',{className:'savebtn',style:{width:'100%'},onClick:async()=>{const p=await requestNotifyPermission();if(p==='granted'){const hs={...hsLocal,notify_on:true};setHsLocal(hs);saveHydrationSettings(hs);}}},'Allow notifications')
+            )
+          :h('div',null,
+              h('div',{className:'tog-row',style:{marginBottom:'8px'}},
+                h('div',null,h('div',{className:'toglbl'},'Hydration reminders'),h('div',{className:'togdesc'},'Notify me to drink')),
+                h('div',{className:'tog'+(hsLocal.notify_on?' on':''),onClick:()=>{const hs={...hsLocal,notify_on:!hsLocal.notify_on};setHsLocal(hs);saveHydrationSettings(hs);}})
+              ),
+              hsLocal.notify_on&&h('div',null,
+                h('div',{className:'g2',style:{gap:'8px',marginBottom:'8px'}},
+                  h('div',{className:'grow',style:{marginBottom:0}},h('label',null,'Start time'),h('input',{type:'time',value:hsLocal.notify_start,onChange:e=>{setHsLocal(p=>({...p,notify_start:e.target.value}));setHydrationSettingsDirty(true);}})),
+                  h('div',{className:'grow',style:{marginBottom:0}},h('label',null,'End time'),h('input',{type:'time',value:hsLocal.notify_end,onChange:e=>{setHsLocal(p=>({...p,notify_end:e.target.value}));setHydrationSettingsDirty(true);}}))
+                ),
+                h('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'7px'}},'Remind every:'),
+                h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'10px'}},
+                  [{l:'30 min',m:30},{l:'1 hr',m:60},{l:'1.5 hr',m:90},{l:'2 hr',m:120},{l:'3 hr',m:180}].map(({l,m})=>
+                    h('button',{key:m,onClick:()=>{setHsLocal(p=>({...p,notify_min:m}));setHydrationSettingsDirty(true);},style:{padding:'6px 12px',background:hsLocal.notify_min===m?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+(hsLocal.notify_min===m?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'12px',color:hsLocal.notify_min===m?'var(--accent)':'var(--text2)',cursor:'pointer',fontWeight:500}},l)
+                  )
+                ),
+                hydrationSettingsDirty&&h('button',{className:'savebtn',onClick:()=>saveHydrationSettings(hsLocal)},'Save reminder settings')
+              )
+            )
       )
     );
   }
+
 
   const VIEWS={today:ViewToday,week:ViewWeek,chat:ViewChat,goals:ViewGoals,history:ViewHistory,hydration:ViewHydration,advice:ViewAdvice,settings:ViewSettings};
   const CurrentView=VIEWS[view]||ViewToday;
@@ -1771,7 +1822,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     // Header
     h('header',{className:'header'},
       h('div',{className:'logo'},'GRAMS'),
-      h('nav',{className:'desk-nav'},['today','week','chat','goals','history','hydration','advice','settings'].map(v=>h('button',{key:v,className:'nb'+(view===v?' on':''),onClick:()=>setView(v)},v==='hydration'?'💧 Water':v.charAt(0).toUpperCase()+v.slice(1)))),
+      h('nav',{className:'desk-nav'},['today','week','chat','goals','history','hydration','advice','settings'].map(v=>h('button',{key:v,className:'nb'+(view===v?' on':''),onClick:()=>setView(v)},v==='hydration'?'💧 Hydration':v.charAt(0).toUpperCase()+v.slice(1)))),
       h('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
         syncing&&h('div',{className:'syncing'},h('div',{className:'spin-sm'}),'Syncing'),
         h('div',{style:{fontSize:'11px',color:'var(--text3)',padding:'3px 7px'}},user.email?.split('@')[0])
@@ -1786,7 +1837,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
 
     // Mobile nav
     h('nav',{className:'mob-nav'},
-      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'hydration',ico:'💧',lbl:'Water'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
+      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'hydration',ico:'💧',lbl:'Hydration'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
         h('button',{key:t.id,className:'mnbtn'+(view===t.id?' on':''),onClick:()=>setView(t.id)},h('span',{className:'mnico'},t.ico),t.lbl)
       )
     )
