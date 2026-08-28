@@ -1012,6 +1012,34 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     if(key==='advancedMode')await sb.from('profiles').update({advanced_mode:val}).eq('id',user.id);
   }
 
+  async function getAdvice(){
+    setAdvLoading(true);
+    const days=last7Dates();
+    const wd=days.map(d=>{const t=(entries[d]||[]).reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});return `${d}: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F`;}).join('\n');
+    try{
+      const advice=await callClaude([{role:'user',content:`My week:\n${wd}\n\nGoals: ${goals.calories}kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%\n\nGive warm specific advice under 200 words with 3 concrete tips.`}],'You are a professional sports nutritionist.');
+      setAiAdvice(advice);
+      const {data:saved}=await sb.from('ai_advice').insert({user_id:user.id,advice,week_start:days[0]}).select().single();
+      if(saved)setAdviceHistory(p=>[saved,...p].slice(0,10));
+    }catch(err){setAiAdvice('Error: '+err.message);}
+    setAdvLoading(false);
+  }
+
+  async function handleChat(){
+    const msg=chatInput.trim();
+    if(!msg||chatLoading)return;
+    setChatInput('');
+    setChatMsgs(p=>[...p,{role:'user',text:msg}]);
+    setChatLoading(true);
+    const tod=todayStr();
+    const todT=(entries[tod]||[]).reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
+    const wk=last7Dates().reduce((acc,d)=>{(entries[d]||[]).forEach(x=>{acc.cal+=x.calories||0;acc.p+=x.protein||0;});return acc;},{cal:0,p:0});
+    const sys=`You are GRAMS, a direct nutrition AI. Answer in 2-4 sentences. Give clear yes/no answers.\nToday: ${Math.round(todT.cal)} kcal, ${Math.round(todT.p)}g P, ${Math.round(todT.c)}g C, ${Math.round(todT.f)}g F\nGoals: ${goals.calories} kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nWeek avg/day: ${Math.round(wk.cal/7)} kcal, ${Math.round(wk.p/7)}g P\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%`;
+    try{const reply=await callClaude([{role:'user',content:msg}],sys);setChatMsgs(p=>[...p,{role:'ai',text:reply}]);}
+    catch(err){setChatMsgs(p=>[...p,{role:'ai',text:'Error: '+err.message}]);}
+    setChatLoading(false);
+  }
+
   // ── Hydration helpers ───────────────────────────────────────
   function mlToDisplay(ml){
     const hs=hydrationSettings;
