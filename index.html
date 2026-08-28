@@ -9,6 +9,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GRAMS">
+<meta name="theme-color" content="#ff6b1a">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -645,15 +650,16 @@ function App({user,onLogout}) {
   const [savedFoods,setSavedFoods]=useState([]);
   const [adviceHistory,setAdviceHistory]=useState([]);
   const [weekRange,setWeekRange]=useState('7d');
-  const [activities,setActivities]=useState({});   // {date: [{id,name,duration_min,calories_burned,notes}]}
-  const [fitnessProfile,setFitnessProfile]=useState({height_cm:'',age:'',sex:'male',activity_level:'moderate'});
-  const [fitbitToken,setFitbitToken]=useState(null);   // {access_token, refresh_token, expires_at}
-  const [fitbitSyncing,setFitbitSyncing]=useState(false);
-  const [fitbitLastSync,setFitbitLastSync]=useState(null);
-  const [fitbitDebug,setFitbitDebug]=useState(null);
-  const [actForm,setActForm]=useState({name:'',duration_min:'',calories_burned:'',notes:''});
-  const [fpForm,setFpForm]=useState({height_cm:'',age:'',sex:'male',activity_level:'moderate'});
-  const [fpDirty,setFpDirty]=useState(false);
+  // ── Hydration state ──────────────────────────────────────────
+  const [hydrationLogs,setHydrationLogs]=useState({});  // {date: [{id,amount_ml,electrolyte_id,electrolyte_servings,notes,logged_at}]}
+  const [electrolytes,setElectrolytes]=useState([]);
+  const [hydrationSettings,setHydrationSettings]=useState({goal_ml:3785,unit:'oz',notify_start:'08:00',notify_end:'22:00',notify_min:60,notify_on:false});
+  const [hydrationSettingsDirty,setHydrationSettingsDirty]=useState(false);
+  const [notifyPermission,setNotifyPermission]=useState('default');
+  const notifyTimerRef=useRef(null);
+  const [showElectrolyteForm,setShowElectrolyteForm]=useState(false);
+  const [eForm,setEForm]=useState({name:'',brand:'',serving_size:'1',serving_unit:'serving',calories:'0',protein:'0',carbs:'0',fat:'0',sodium_mg:'0',potassium_mg:'0',magnesium_mg:'0',notes:''});
+  const [showElectrolyteLib,setShowElectrolyteLib]=useState(false);
   const [editSaveError,setEditSaveError]=useState('');
   // Input state
   const [inputMode,setInputMode]=useState('ai');
@@ -714,43 +720,34 @@ function App({user,onLogout}) {
       const {data:ah}=await sb.from('ai_advice').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).limit(10);
       if(ah)setAdviceHistory(ah);
 
-      // Load activities (last 366 days)
-      const {data:acts}=await sb.from('activities').select('*').eq('user_id',user.id).gte('logged_date',localDate(since)).order('logged_at',{ascending:true});
-      if(acts){
-        const amap={};
-        acts.forEach(r=>{const d=r.logged_date;if(!amap[d])amap[d]=[];amap[d].push(r);});
-        setActivities(amap);
+      // Load hydration logs
+      const {data:hl}=await sb.from('hydration_logs').select('*').eq('user_id',user.id).gte('logged_date',localDate(since)).order('logged_at',{ascending:true});
+      if(hl){
+        const hmap={};
+        hl.forEach(r=>{const d=r.logged_date;if(!hmap[d])hmap[d]=[];hmap[d].push(r);});
+        setHydrationLogs(hmap);
       }
 
-      // Load fitness profile fields from profiles table
+      // Load electrolytes
+      const {data:el}=await sb.from('electrolytes').select('*').eq('user_id',user.id).order('use_count',{ascending:false});
+      if(el)setElectrolytes(el);
+
+      // Load hydration settings from profile
       if(prof){
-        const fp={height_cm:prof.height_cm||'',age:prof.age||'',sex:prof.sex||'male',activity_level:prof.activity_level||'moderate'};
-        setFitnessProfile(fp);
-        setFpForm(fp);
+        setHydrationSettings({
+          goal_ml:prof.hydration_goal_ml||3785,
+          unit:prof.hydration_unit||'oz',
+          notify_start:prof.hydration_notify_start||'08:00',
+          notify_end:prof.hydration_notify_end||'22:00',
+          notify_min:prof.hydration_notify_min||60,
+          notify_on:prof.hydration_notify_on||false
+        });
       }
-      // Load Fitbit tokens
-      const {data:ft}=await sb.from('fitbit_tokens').select('*').eq('user_id',user.id).single();
-      if(ft)setFitbitToken({access_token:ft.access_token,refresh_token:ft.refresh_token,expires_at:ft.expires_at});
+
+      // Check notification permission
+      if('Notification' in window)setNotifyPermission(Notification.permission);
 
       setSyncing(false); setInitDone(true);
-
-      // Handle OAuth callback — check URL params for Fitbit tokens
-      const params=new URLSearchParams(window.location.search);
-      if(params.get('fitbit_access_token')){
-        const at=params.get('fitbit_access_token');
-        const rt=params.get('fitbit_refresh_token')||'';
-        const expiresAt=new Date(Date.now()+(parseInt(params.get('fitbit_expires_in')||3600)*1000)).toISOString();
-        // Save to Supabase
-        await sb.from('fitbit_tokens').upsert({user_id:user.id,access_token:at,refresh_token:rt,expires_at:expiresAt},{onConflict:'user_id'});
-        setFitbitToken({access_token:at,refresh_token:rt,expires_at:expiresAt});
-        // Clean URL
-        window.history.replaceState({},'',window.location.pathname);
-        setView('activity');
-      }
-      if(params.get('fitbit_error')){
-        console.error('Fitbit OAuth error:',params.get('fitbit_error'));
-        window.history.replaceState({},'',window.location.pathname);
-      }
     }
     init();
   },[user.id]);
@@ -1012,162 +1009,102 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     if(key==='advancedMode')await sb.from('profiles').update({advanced_mode:val}).eq('id',user.id);
   }
 
-  // ── TDEE (Total Daily Energy Expenditure) ────────────────────
-  function calcTDEE(){
-    const w=parseFloat(goals.weight)||0;
-    const h=parseFloat(fitnessProfile.height_cm)||0;
-    const a=parseInt(fitnessProfile.age)||0;
-    const sex=fitnessProfile.sex||'male';
-    if(!w||!h||!a)return null;
-    // Mifflin-St Jeor BMR
-    const bmr=sex==='female'
-      ?(10*w)+(6.25*h)-(5*a)-161
-      :(10*w)+(6.25*h)-(5*a)+5;
-    const multipliers={sedentary:1.2,light:1.375,moderate:1.55,active:1.725,very_active:1.9};
-    const mult=multipliers[fitnessProfile.activity_level]||1.55;
-    return Math.round(bmr*mult);
+  // ── Hydration helpers ───────────────────────────────────────
+  function mlToDisplay(ml){
+    const hs=hydrationSettings;
+    if(hs.unit==='oz') return Math.round(ml/29.5735*10)/10;
+    if(hs.unit==='L')  return Math.round(ml/1000*100)/100;
+    if(hs.unit==='gal') return Math.round(ml/3785.41*100)/100;
+    return Math.round(ml); // ml
   }
-
-  async function saveFitnessProfile(fp){
-    setFitnessProfile(fp);
-    await sb.from('profiles').update({
-      height_cm:parseFloat(fp.height_cm)||null,
-      age:parseInt(fp.age)||null,
-      sex:fp.sex,
-      activity_level:fp.activity_level
-    }).eq('id',user.id);
+  function displayToMl(val){
+    const hs=hydrationSettings;
+    if(hs.unit==='oz') return val*29.5735;
+    if(hs.unit==='L')  return val*1000;
+    if(hs.unit==='gal') return val*3785.41;
+    return val;
   }
+  const hydUnit=hydrationSettings.unit;
 
-  // ── Activity log ─────────────────────────────────────────────
-  async function logActivity(act){
+  async function logWater(ml,electrolyte=null,servings=0){
     const tod=todayStr();
-    const row={user_id:user.id,logged_date:tod,logged_at:new Date().toISOString(),name:act.name,duration_min:Math.round(act.duration_min||0),calories_burned:Math.round(act.calories_burned||0),notes:act.notes||''};
-    const {data:ins,error}=await sb.from('activities').insert(row).select().single();
-    if(error){console.error('logActivity:',error);return;}
-    if(ins)setActivities(p=>({...p,[tod]:[...(p[tod]||[]),ins]}));
-  }
-
-  async function deleteActivity(date,id){
-    await sb.from('activities').delete().eq('id',id).eq('user_id',user.id);
-    setActivities(p=>({...p,[date]:(p[date]||[]).filter(a=>a.id!==id)}));
-  }
-
-  function connectFitbit(){
-    const clientId='782537530246-8j8tsf3rot20tg0mcr21ska30b4phauf.apps.googleusercontent.com';
-    const redirectUri=encodeURIComponent('https://nutriai-tracker-kappa.vercel.app/api/fitbit-callback');
-    const scopes=[
-      'https://www.googleapis.com/auth/fitness.activity.read',
-      'https://www.googleapis.com/auth/fitness.body.read',
-      'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly'
-    ];
-    const scope=encodeURIComponent(scopes.join(' '));
-    const url=`https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&access_type=offline&scope=${scope}&prompt=consent`;
-    window.location.href=url;
-  }
-
-  async function disconnectFitbit(){
-    await sb.from('fitbit_tokens').delete().eq('user_id',user.id);
-    setFitbitToken(null);setFitbitLastSync(null);
-  }
-
-  async function syncFitbit(dateStr){
-    if(!fitbitToken)return;
-    setFitbitSyncing(true);
-    try{
-      const res=await fetch('/api/fitbit-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:fitbitToken.access_token,refresh_token:fitbitToken.refresh_token,date:dateStr||todayStr()})});
-      const data=await res.json();
-      if(data.error){
-        console.error('Fitbit sync error:',data.error);
-        setFitbitDebug({error:data.error, details:data.details, raw:data});
-        setFitbitLastSync('Error: '+data.error);
-        setFitbitSyncing(false);
-        return;
-      }
-
-      // Log debug info
-      console.log('Fitbit sync result:',{steps:data.steps,calories:data.calories_burned,active_min:data.active_minutes,debug:data.debug});
-      setFitbitDebug(data.debug);
-
-      // If token was refreshed, save the new one
-      if(data.new_access_token){
-        const newToken={access_token:data.new_access_token,refresh_token:data.new_refresh_token||fitbitToken.refresh_token,expires_at:new Date(Date.now()+3600000).toISOString()};
-        await sb.from('fitbit_tokens').upsert({user_id:user.id,...newToken},{onConflict:'user_id'});
-        setFitbitToken(newToken);
-      }
-
-      const actDate=dateStr||todayStr();
-      const hasFitbitSource=data.debug?.has_fitbit_source;
-      const syncNote=!hasFitbitSource?'No Fitbit data source found in Google Fit — enable sync in Fitbit app settings':'';
-
-      // Log as activity if we got data
-      if(data.steps>0||data.calories_burned>0){
-        const existing=(activities[actDate]||[]).find(a=>a.name==='Fitbit daily activity');
-        const notes=`${data.steps.toLocaleString()} steps · ${data.active_minutes} active min`;
-        if(existing){
-          await sb.from('activities').update({calories_burned:data.calories_burned,notes}).eq('id',existing.id);
-          setActivities(p=>({...p,[actDate]:(p[actDate]||[]).map(a=>a.id===existing.id?{...a,calories_burned:data.calories_burned,notes}:a)}));
-        } else {
-          const row={user_id:user.id,logged_date:actDate,logged_at:new Date().toISOString(),name:'Fitbit daily activity',duration_min:data.active_minutes||0,calories_burned:data.calories_burned||0,notes};
-          const {data:ins}=await sb.from('activities').insert(row).select().single();
-          if(ins)setActivities(p=>({...p,[actDate]:[...(p[actDate]||[]),ins]}));
-        }
-        setFitbitLastSync(new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}));
-      } else {
-        // No data returned — show why
-        setFitbitLastSync('Synced — '+
-          (hasFitbitSource===false
-            ? 'Fitbit not linked to Google Fit. Open Fitbit app → Settings → Connected Apps → link Google Fit'
-            : data.debug?.bucket_count===0
-            ? 'no data for today yet (check back later)'
-            : 'no activity recorded today')
-        );
-      }
-    }catch(err){
-      console.error('Fitbit sync failed:',err);
-      setFitbitDebug({error:err.message});
-      setFitbitLastSync('Error: '+err.message);
+    const row={user_id:user.id,logged_date:tod,logged_at:new Date().toISOString(),amount_ml:Math.round(ml),electrolyte_id:electrolyte?.id||null,electrolyte_servings:servings,notes:''};
+    const {data:ins,error}=await sb.from('hydration_logs').insert(row).select().single();
+    if(error){console.error('logWater:',error);return;}
+    if(ins)setHydrationLogs(p=>({...p,[tod]:[...(p[tod]||[]),ins]}));
+    // If electrolyte has calories, add to food log
+    if(electrolyte&&servings>0&&(electrolyte.calories>0||electrolyte.protein>0||electrolyte.carbs>0)){
+      const macros={name:electrolyte.name+(electrolyte.brand?' ('+electrolyte.brand+')':''),calories:Math.round((electrolyte.calories||0)*servings),protein:Math.round((electrolyte.protein||0)*servings),carbs:Math.round((electrolyte.carbs||0)*servings),fat:Math.round((electrolyte.fat||0)*servings),fiber:0,micros:{sodium:Math.round((electrolyte.sodium_mg||0)*servings),potassium:Math.round((electrolyte.potassium_mg||0)*servings),magnesium:Math.round((electrolyte.magnesium_mg||0)*servings)}};
+      if(macros.calories>0||macros.protein>0||macros.carbs>0)await saveEntry(macros);
     }
-    setFitbitSyncing(false);
+    // Update electrolyte use count
+    if(electrolyte){
+      await sb.from('electrolytes').update({use_count:electrolyte.use_count+1}).eq('id',electrolyte.id);
+      setElectrolytes(p=>p.map(e=>e.id===electrolyte.id?{...e,use_count:e.use_count+1}:e).sort((a,b)=>b.use_count-a.use_count));
+    }
   }
 
-  // Auto-sync Fitbit on load if connected
+  async function deleteHydrationLog(date,id){
+    await sb.from('hydration_logs').delete().eq('id',id).eq('user_id',user.id);
+    setHydrationLogs(p=>({...p,[date]:(p[date]||[]).filter(x=>x.id!==id)}));
+  }
+
+  async function saveHydrationSettings(hs){
+    setHydrationSettings(hs);
+    setHydrationSettingsDirty(false);
+    await sb.from('profiles').update({
+      hydration_goal_ml:hs.goal_ml,
+      hydration_unit:hs.unit,
+      hydration_notify_start:hs.notify_start,
+      hydration_notify_end:hs.notify_end,
+      hydration_notify_min:hs.notify_min,
+      hydration_notify_on:hs.notify_on
+    }).eq('id',user.id);
+    if(hs.notify_on)scheduleNotifications(hs);
+    else clearNotifications();
+  }
+
+  async function saveElectrolyte(form){
+    const row={user_id:user.id,name:form.name.trim(),brand:form.brand.trim(),serving_size:parseFloat(form.serving_size)||1,serving_unit:form.serving_unit||'serving',calories:parseFloat(form.calories)||0,protein:parseFloat(form.protein)||0,carbs:parseFloat(form.carbs)||0,fat:parseFloat(form.fat)||0,sodium_mg:parseFloat(form.sodium_mg)||0,potassium_mg:parseFloat(form.potassium_mg)||0,magnesium_mg:parseFloat(form.magnesium_mg)||0,notes:form.notes||'',use_count:0};
+    const {data:saved}=await sb.from('electrolytes').insert(row).select().single();
+    if(saved){setElectrolytes(p=>[saved,...p]);setShowElectrolyteForm(false);setEForm({name:'',brand:'',serving_size:'1',serving_unit:'serving',calories:'0',protein:'0',carbs:'0',fat:'0',sodium_mg:'0',potassium_mg:'0',magnesium_mg:'0',notes:''});}
+  }
+
+  async function deleteElectrolyte(id){
+    await sb.from('electrolytes').delete().eq('id',id).eq('user_id',user.id);
+    setElectrolytes(p=>p.filter(e=>e.id!==id));
+  }
+
+  async function requestNotifyPermission(){
+    if(!('Notification' in window))return;
+    const perm=await Notification.requestPermission();
+    setNotifyPermission(perm);
+    return perm;
+  }
+
+  function scheduleNotifications(hs){
+    if(notifyTimerRef.current)clearInterval(notifyTimerRef.current);
+    const intervalMs=(hs.notify_min||60)*60*1000;
+    notifyTimerRef.current=setInterval(()=>{
+      const now=new Date();
+      const timeStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+      if(timeStr>=hs.notify_start&&timeStr<=hs.notify_end){
+        if(Notification.permission==='granted'){
+          new Notification('💧 Time to hydrate!',{body:'Don\'t forget to drink water',icon:'/icon-192.png',tag:'hydration',renotify:true});
+        }
+      }
+    },intervalMs);
+  }
+
+  function clearNotifications(){
+    if(notifyTimerRef.current){clearInterval(notifyTimerRef.current);notifyTimerRef.current=null;}
+  }
+
+  // Start notifications on load if enabled
   useEffect(()=>{
-    if(fitbitToken&&initDone)syncFitbit(todayStr());
-  },[fitbitToken?.access_token,initDone]);
-
-  // ── AI advice ────────────────────────────────────────────────
-  async function getAdvice(){
-    setAdvLoading(true);
-    const days=last7Dates();
-    const wd=days.map(d=>{const t=(entries[d]||[]).reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});return `${d}: ${Math.round(t.cal)} kcal, ${Math.round(t.p)}g P, ${Math.round(t.c)}g C, ${Math.round(t.f)}g F`;}).join('\n');
-    try{
-      const advice=await callClaude([{role:'user',content:`My week:\n${wd}\n\nGoals: ${goals.calories}kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%\n\nGive warm specific advice under 200 words with 3 concrete tips.`}],'You are a professional sports nutritionist.');
-      setAiAdvice(advice);
-      const {data:saved}=await sb.from('ai_advice').insert({user_id:user.id,advice,week_start:days[0]}).select().single();
-      if(saved)setAdviceHistory(p=>[saved,...p].slice(0,10));
-    }catch(err){setAiAdvice('Error: '+err.message);}
-    setAdvLoading(false);
-  }
-
-  // ── Chat ─────────────────────────────────────────────────────
-  async function handleChat(){
-    const msg=chatInput.trim();
-    if(!msg||chatLoading)return;
-    setChatInput('');
-    setChatMsgs(p=>[...p,{role:'user',text:msg}]);
-    setChatLoading(true);
-    const tod=todayStr();
-    const todT=(entries[tod]||[]).reduce((a,x)=>({cal:a.cal+(x.calories||0),p:a.p+(x.protein||0),c:a.c+(x.carbs||0),f:a.f+(x.fat||0)}),{cal:0,p:0,c:0,f:0});
-    const wk=last7Dates().reduce((acc,d)=>{(entries[d]||[]).forEach(x=>{acc.cal+=x.calories||0;acc.p+=x.protein||0;});return acc;},{cal:0,p:0});
-    const todActs=activities[tod]||[];
-    const todBurned=todActs.reduce((s,a)=>s+a.calories_burned,0);
-    const tdee=calcTDEE();
-    const sys=`You are GRAMS, a direct nutrition AI. Answer in 2-4 sentences. Give clear yes/no answers. Use the user's data.\nToday (${tod}): ${Math.round(todT.cal)} kcal in, ${todBurned>0?todBurned+' kcal burned via logged activity,':''} ${Math.round(todT.p)}g P, ${Math.round(todT.c)}g C, ${Math.round(todT.f)}g F\nGoals: ${goals.calories} kcal, ${goals.protein}g P, ${goals.carbs}g C, ${goals.fat}g F\nTDEE: ${tdee?tdee+' kcal/day (estimated from stats)':'not set — user hasn\'t entered height/age'}\nWeek avg/day: ${Math.round(wk.cal/7)} kcal, ${Math.round(wk.p/7)}g P\nBody: ${goals.weight}kg→${goals.target_weight}kg, BF ${goals.body_fat}%→${goals.target_body_fat}%\nNote: Activity data is tracked for context only — do not subtract calories burned from food goals.`;
-    try{const reply=await callClaude([{role:'user',content:msg}],sys);setChatMsgs(p=>[...p,{role:'ai',text:reply}]);}
-    catch(err){setChatMsgs(p=>[...p,{role:'ai',text:'Error: '+err.message}]);}
-    setChatLoading(false);
-  }
-
+    if(hydrationSettings.notify_on&&notifyPermission==='granted')scheduleNotifications(hydrationSettings);
+    return()=>clearNotifications();
+  },[hydrationSettings.notify_on,hydrationSettings.notify_min,notifyPermission]);
   // ── Derived ──────────────────────────────────────────────────
   const tod=todayStr();
   const todayEntries=entries[tod]||[];
@@ -1304,9 +1241,11 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
   // ── Content views ─────────────────────────────────────────────
   function ViewToday(){
     const tod=todayStr();
-    const todayActs=activities[tod]||[];
-    const todayBurned=todayActs.reduce((s,a)=>s+a.calories_burned,0);
-    const tdee=calcTDEE();
+    // Today hydration
+    const todayHydLogs=hydrationLogs[tod]||[];
+    const todayHydMl=todayHydLogs.reduce((s,x)=>s+(x.amount_ml||0),0);
+    const hydGoalMl=hydrationSettings.goal_ml||3785;
+    const hydPct=Math.min(100,(todayHydMl/hydGoalMl)*100);
     return h('div',null,
       h('h1',{className:'stitle'},"Today"),
       h('div',{className:'g2',style:{marginBottom:'12px'}},
@@ -1314,16 +1253,17 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
           h('div',{className:'ctitle'},'Calories in'),
           h('div',{style:{display:'flex',alignItems:'baseline',gap:'4px',marginBottom:'9px'}},h('span',{className:'snum',style:{color:calColor}},Math.round(totals.calories)),h('span',{className:'sunit'},'/ '+goals.calories+' kcal')),
           h('div',{className:'pbar'},h('div',{className:'pfill',style:{width:Math.min(100,(totals.calories/goals.calories)*100)+'%',background:calColor}})),
-          h('div',{style:{marginTop:'6px',fontSize:'12px',color:'var(--text2)'}},goals.calories-totals.calories>0?Math.round(goals.calories-totals.calories)+' kcal left':Math.round(totals.calories-goals.calories)+' kcal over'),
-          (todayBurned>0||tdee)&&h('div',{style:{marginTop:'8px',paddingTop:'8px',borderTop:'1px solid var(--border)',display:'flex',gap:'10px',flexWrap:'wrap'}},
-            todayBurned>0&&h('div',{style:{fontSize:'11px',color:'var(--accent)'},onClick:()=>setView('activity'),title:'View activity log'},'🔥 '+todayBurned+' kcal burned'),
-            tdee&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'~'+tdee+' TDEE'),
-            tdee&&h('div',{style:{fontSize:'11px',color:totals.calories<tdee?'var(--carbs)':'var(--protein)'}},
-              totals.calories<tdee?'↓ '+(tdee-totals.calories)+' below TDEE':'↑ '+(totals.calories-tdee)+' above TDEE'
-            )
-          )
+          h('div',{style:{marginTop:'6px',fontSize:'12px',color:'var(--text2)'}},goals.calories-totals.calories>0?Math.round(goals.calories-totals.calories)+' kcal left':Math.round(totals.calories-goals.calories)+' kcal over')
         ),
-        h('div',{className:'card',style:{marginBottom:0}},h('div',{className:'ctitle'},'Split'),h(PieChart,{protein:totals.protein,carbs:totals.carbs,fat:totals.fat}))
+        h('div',{className:'card',style:{marginBottom:0,cursor:'pointer'},onClick:()=>setView('hydration')},
+          h('div',{className:'ctitle'},'Hydration 💧'),
+          h('div',{style:{display:'flex',alignItems:'baseline',gap:'4px',marginBottom:'9px'}},
+            h('span',{className:'snum',style:{fontSize:'24px',color:hydPct>=100?'#54b4e0':hydPct>50?'var(--accent)':'var(--text2)'}},mlToDisplay(todayHydMl)),
+            h('span',{className:'sunit'},'/ '+mlToDisplay(hydGoalMl)+' '+hydUnit)
+          ),
+          h('div',{className:'pbar'},h('div',{className:'pfill',style:{width:hydPct+'%',background:hydPct>=100?'#54b4e0':'#54b4e0',opacity:hydPct>=100?1:0.7}})),
+          h('div',{style:{marginTop:'6px',fontSize:'12px',color:'var(--text2)'}},hydPct>=100?'Goal reached! 🎉':Math.round(mlToDisplay(hydGoalMl-todayHydMl))+' '+hydUnit+' to go')
+        )
       ),
       h('div',{className:'card'},
         h('div',{className:'ctitle'},'Macros'),
@@ -1332,6 +1272,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
         h(MacroBar,{label:'Fat',current:totals.fat,goal:goals.fat,color:'#e08c3a'}),
         totals.fiber>0&&h(MacroBar,{label:'Fiber',current:totals.fiber,goal:30,color:'#c97a30'})
       ),
+      h('div',{className:'card',style:{marginBottom:0}},h('div',{className:'ctitle'},'Split'),h(PieChart,{protein:totals.protein,carbs:totals.carbs,fat:totals.fat})),
       settings.advancedMode&&h('div',{className:'card'},
         h('div',{className:'ctitle'},'Micronutrients'),
         h('div',{className:'mgrid'},
@@ -1342,7 +1283,6 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
       )
     );
   }
-
   function ViewWeek(){
     const RANGES=[{id:'7d',label:'Week'},{id:'2w',label:'2 Wks'},{id:'1m',label:'Month'},{id:'3m',label:'3 Mo'},{id:'6m',label:'6 Mo'},{id:'1y',label:'Year'}];
     const days=getRangeDates(weekRange);
@@ -1598,167 +1538,193 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     );
   }
 
-  function ViewActivity(){
+  function ViewHydration(){
     const tod=todayStr();
-    const todayActs=activities[tod]||[];
-    const todayBurned=todayActs.reduce((s,a)=>s+a.calories_burned,0);
-    const tdee=calcTDEE();
-    const ACTIVITY_PRESETS=[
-      {name:'Walking',metFactor:3.5},{name:'Running',metFactor:9.8},{name:'Cycling',metFactor:7.5},
-      {name:'Weight training',metFactor:4.0},{name:'HIIT',metFactor:10.0},{name:'Swimming',metFactor:6.0},
-      {name:'Yoga',metFactor:2.5},{name:'Hiking',metFactor:5.3}
-    ];
-    function estimateBurn(name,duration){
-      const w=parseFloat(goals.weight)||75;
-      const preset=ACTIVITY_PRESETS.find(p=>p.name===name);
-      const met=preset?preset.metFactor:4.0;
-      return Math.round((met*3.5*w/200)*(parseInt(duration)||0));
-    }
+    const todayLogs=hydrationLogs[tod]||[];
+    const todayMl=todayLogs.reduce((s,x)=>s+(x.amount_ml||0),0);
+    const goalMl=hydrationSettings.goal_ml||3785;
+    const pct=Math.min(100,(todayMl/goalMl)*100);
+    const remaining=Math.max(0,goalMl-todayMl);
+    const QUICK=[{label:'8 oz',ml:237},{label:'12 oz',ml:355},{label:'16 oz',ml:473},{label:'32 oz',ml:946},{label:'1 L',ml:1000},{label:'Custom',ml:0}];
+    const UNITS_OPTS=[{v:'oz',l:'oz (fluid ounces)'},{v:'ml',l:'ml (millilitres)'},{v:'L',l:'L (litres)'},{v:'gal',l:'gal (gallons)'}];
+    const GOAL_PRESETS=[{label:'Half gallon',ml:1893},{label:'1 gallon',ml:3785},{label:'2 L',ml:2000},{label:'3 L',ml:3000},{label:'100 oz',ml:2957}];
+    const INTERVALS=[{label:'30 min',min:30},{label:'1 hr',min:60},{label:'1.5 hr',min:90},{label:'2 hr',min:120},{label:'3 hr',min:180}];
+    const [customMl,setCustomMl]=useState('');
+    const [selElectrolyte,setSelElectrolyte]=useState(null);
+    const [eServings,setEServings]=useState('1');
+    const [hsLocal,setHsLocal]=useState({...hydrationSettings});
+
+    // How much to drink each interval to hit goal
+    const notifyCount=hydrationSettings.notify_on&&hydrationSettings.notify_min>0?(()=>{
+      const [sh,sm]=hydrationSettings.notify_start.split(':').map(Number);
+      const [eh,em]=hydrationSettings.notify_end.split(':').map(Number);
+      const windowMin=(eh*60+em)-(sh*60+sm);
+      const intervals=Math.floor(windowMin/hydrationSettings.notify_min)||1;
+      return {intervals,perInterval:Math.round(mlToDisplay(goalMl/intervals)*10)/10};
+    })():null;
 
     return h('div',null,
-      h('h1',{className:'stitle'},'Activity'),
+      h('h1',{className:'stitle'},'Hydration 💧'),
 
-      // TDEE estimation card
+      // Progress card
       h('div',{className:'card'},
-        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
-          h('div',{className:'ctitle',style:{margin:0}},'Estimated daily burn (TDEE)'),
-          tdee&&h('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'22px',color:'var(--accent)'}},tdee+' kcal')
+        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
+          h('div',{className:'ctitle',style:{margin:0}},'Today'),
+          h('div',{style:{fontFamily:'DM Serif Display,serif',fontSize:'22px',color:pct>=100?'#54b4e0':'var(--accent)'}},mlToDisplay(todayMl)+' '+hydUnit)
         ),
-        !tdee&&h('div',{style:{fontSize:'13px',color:'var(--text3)',marginBottom:'10px'}},'Add your height and age below to calculate your Total Daily Energy Expenditure.'),
-        h('div',{className:'g2',style:{gap:'8px',marginBottom:'10px'}},
-          [
-            {k:'height_cm',lbl:'Height (cm)',type:'number',ph:'e.g. 178'},
-            {k:'age',lbl:'Age',type:'number',ph:'e.g. 28'},
-          ].map(({k,lbl,type,ph})=>
-            h('div',{key:k,className:'grow',style:{marginBottom:0}},
-              h('label',null,lbl),
-              h('input',{type,placeholder:ph,value:fpForm[k]||'',onChange:e=>{setFpForm(p=>({...p,[k]:e.target.value}));setFpDirty(true);}})
-            )
-          )
+        h('div',{className:'pbar',style:{height:'10px',borderRadius:'5px'}},
+          h('div',{className:'pfill',style:{width:pct+'%',background:pct>=100?'#54b4e0':'linear-gradient(90deg,#54b4e0,#7ce8ff)',borderRadius:'5px'}})
         ),
-        h('div',{className:'g2',style:{gap:'8px',marginBottom:'12px'}},
-          h('div',{className:'grow',style:{marginBottom:0}},
-            h('label',null,'Sex'),
-            h('select',{value:fpForm.sex||'male',onChange:e=>{setFpForm(p=>({...p,sex:e.target.value}));setFpDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}},
-              h('option',{value:'male'},'Male'),h('option',{value:'female'},'Female')
-            )
+        h('div',{style:{display:'flex',justifyContent:'space-between',marginTop:'8px',fontSize:'12px',color:'var(--text2)'}},
+          h('span',null,pct>=100?'🎉 Goal reached!':mlToDisplay(remaining)+' '+hydUnit+' remaining'),
+          h('span',null,mlToDisplay(goalMl)+' '+hydUnit+' goal')
+        ),
+        notifyCount&&h('div',{style:{marginTop:'10px',background:'rgba(84,180,224,.1)',border:'1px solid rgba(84,180,224,.2)',borderRadius:'var(--radius-sm)',padding:'8px 10px',fontSize:'12px',color:'#54b4e0'}},'💡 Drink ~'+notifyCount.perInterval+' '+hydUnit+' every '+hydrationSettings.notify_min+' min to hit your goal')
+      ),
+
+      // Quick log
+      h('div',{className:'card'},
+        h('div',{className:'ctitle'},'Log water'),
+        h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'10px'}},
+          QUICK.map(q=>h('button',{key:q.label,onClick:()=>{if(q.ml>0){logWater(q.ml,selElectrolyte,selElectrolyte?parseFloat(eServings)||1:0);}},style:{padding:'7px 12px',background:q.ml>0?'var(--surface2)':'var(--accent-dim)',border:'1px solid '+(q.ml>0?'var(--border)':'rgba(255,107,26,.3)'),borderRadius:'20px',fontSize:'12px',color:q.ml>0?'var(--text2)':'var(--accent)',cursor:'pointer',transition:'all .15s',fontWeight:500}},q.label))
+        ),
+        // Custom amount
+        h('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',alignItems:'center'}},
+          h('input',{type:'number',placeholder:'Custom amount',value:customMl,onChange:e=>setCustomMl(e.target.value),style:{flex:1,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none'}}),
+          h('span',{style:{fontSize:'12px',color:'var(--text3)',flexShrink:0}},hydUnit),
+          h('button',{className:'savebtn',style:{padding:'7px 14px',fontSize:'12px'},onClick:()=>{if(customMl){logWater(displayToMl(parseFloat(customMl)),selElectrolyte,selElectrolyte?parseFloat(eServings)||1:0);setCustomMl('');}}},'+')
+        ),
+        // Electrolyte with water
+        electrolytes.length>0&&h('div',null,
+          h('div',{style:{fontSize:'11px',color:'var(--text3)',marginBottom:'6px'}},'Add electrolyte to this drink (optional):'),
+          h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'6px'}},
+            h('button',{onClick:()=>setSelElectrolyte(null),style:{padding:'4px 10px',background:!selElectrolyte?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+((!selElectrolyte)?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'11px',color:(!selElectrolyte)?'var(--accent)':'var(--text3)',cursor:'pointer'}},'None'),
+            electrolytes.map(e=>h('button',{key:e.id,onClick:()=>setSelElectrolyte(e),style:{padding:'4px 10px',background:selElectrolyte?.id===e.id?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+(selElectrolyte?.id===e.id?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'11px',color:selElectrolyte?.id===e.id?'var(--accent)':'var(--text3)',cursor:'pointer'}},e.name))
           ),
-          h('div',{className:'grow',style:{marginBottom:0}},
-            h('label',null,'Activity level'),
-            h('select',{value:fpForm.activity_level||'moderate',onChange:e=>{setFpForm(p=>({...p,activity_level:e.target.value}));setFpDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}},
-              h('option',{value:'sedentary'},'Sedentary (desk job)'),
-              h('option',{value:'light'},'Light (1-3x/week)'),
-              h('option',{value:'moderate'},'Moderate (3-5x/week)'),
-              h('option',{value:'active'},'Active (6-7x/week)'),
-              h('option',{value:'very_active'},'Very active (2x/day)')
-            )
+          selElectrolyte&&h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginBottom:'6px'}},
+            h('span',{style:{fontSize:'11px',color:'var(--text3)'}},'Servings:'),
+            h('input',{type:'number',min:'0.25',step:'0.25',value:eServings,onChange:e=>setEServings(e.target.value),style:{width:'70px',background:'var(--surface2)',border:'1px solid var(--accent)',borderRadius:'5px',padding:'4px 8px',color:'var(--text)',fontSize:'13px',outline:'none',textAlign:'center'}}),
+            selElectrolyte.calories>0&&h('span',{style:{fontSize:'11px',color:'var(--accent)'}},'+'+Math.round(selElectrolyte.calories*(parseFloat(eServings)||1))+' kcal')
           )
-        ),
-        fpDirty&&h('button',{className:'savebtn',onClick:()=>{saveFitnessProfile(fpForm);setFpDirty(false);}},'Save & recalculate'),
-        tdee&&h('div',{style:{marginTop:'10px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px',fontSize:'12px',color:'var(--text2)',lineHeight:1.6}},
-          '📊 Based on your stats, you burn approx. ',h('strong',{style:{color:'var(--accent)'}},tdee+' kcal/day'),' at rest + normal activity.\n',
-          'Your current calorie goal is ',h('strong',null,goals.calories+' kcal'),'.',
-          goals.calories<tdee
-            ?h('span',{style:{color:'var(--carbs)'}},' You\'re in a deficit of ~'+(tdee-goals.calories)+' kcal/day — good for fat loss.')
-            :goals.calories>tdee
-            ?h('span',{style:{color:'var(--protein)'}},' You\'re in a surplus of ~'+(goals.calories-tdee)+' kcal/day — good for gaining.')
-            :h('span',{style:{color:'var(--accent)'}},' You\'re eating at maintenance.')
         )
       ),
 
-      // Today's activity + burn
+      // Today's log
       h('div',{className:'card'},
-        h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
-          h('div',{className:'ctitle',style:{margin:0}},"Today's activity"),
-          todayBurned>0&&h('div',{style:{fontSize:'13px',color:'var(--accent)',fontWeight:600}},'🔥 '+todayBurned+' kcal burned')
-        ),
-
-        // Log activity form
-        h('div',{style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px',marginBottom:'10px'}},
-          h('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:'7px'}},'Log activity'),
-          h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'7px'}},
-            ACTIVITY_PRESETS.map(p=>h('button',{key:p.name,onClick:()=>{
-              const burn=estimateBurn(p.name,actForm.duration_min);
-              setActForm(prev=>({...prev,name:p.name,calories_burned:burn?String(burn):''}));
-            },style:{fontSize:'11px',padding:'3px 9px',background:actForm.name===p.name?'var(--accent-dim)':'var(--surface3)',color:actForm.name===p.name?'var(--accent)':'var(--text2)',border:'1px solid '+(actForm.name===p.name?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',cursor:'pointer',transition:'all .15s'}},p.name))
-          ),
-          h('div',{className:'ov-grid',style:{marginBottom:'7px'}},
-            h('div',{className:'mf'},
-              h('label',null,'Activity name'),
-              h('input',{type:'text',placeholder:'e.g. Morning run',value:actForm.name,onChange:e=>setActForm(p=>({...p,name:e.target.value}))})
+        h('div',{className:'ctitle'},"Today's intake"),
+        todayLogs.length===0&&h('div',{className:'empty',style:{padding:'16px 0'}},h('div',{className:'eico'},'💧'),'Nothing logged yet'),
+        todayLogs.map(log=>{
+          const el=electrolytes.find(e=>e.id===log.electrolyte_id);
+          return h('div',{key:log.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderTop:'1px solid var(--border)'}},
+            h('div',null,
+              h('div',{style:{fontSize:'13px',fontWeight:500,color:'#54b4e0'}},mlToDisplay(log.amount_ml)+' '+hydUnit),
+              el&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'+ '+el.name+(log.electrolyte_servings?' ×'+log.electrolyte_servings:''))
             ),
-            h('div',{className:'mf'},
-              h('label',null,'Duration (min)'),
-              h('input',{type:'number',placeholder:'30',value:actForm.duration_min,onChange:e=>{
-                const dur=e.target.value;
-                const burn=estimateBurn(actForm.name,dur);
-                setActForm(p=>({...p,duration_min:dur,calories_burned:burn?String(burn):p.calories_burned}));
-              }})
-            ),
-            h('div',{className:'mf'},
-              h('label',null,'Calories burned'),
-              h('input',{type:'number',placeholder:'auto-estimated',value:actForm.calories_burned,onChange:e=>setActForm(p=>({...p,calories_burned:e.target.value}))})
-            ),
-            h('div',{className:'mf'},
-              h('label',null,'Notes (optional)'),
-              h('input',{type:'text',placeholder:'e.g. felt great',value:actForm.notes,onChange:e=>setActForm(p=>({...p,notes:e.target.value}))})
+            h('div',{style:{display:'flex',gap:'7px',alignItems:'center'}},
+              h('span',{style:{fontSize:'11px',color:'var(--text3)'}},(new Date(log.logged_at)).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})),
+              h('button',{onClick:()=>deleteHydrationLog(tod,log.id),style:{fontSize:'11px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
             )
-          ),
-          h('button',{className:'add-btn',onClick:()=>{
-            if(!actForm.name.trim())return;
-            logActivity(actForm);
-            setActForm({name:'',duration_min:'',calories_burned:'',notes:''});
-          }},'Log activity')
-        ),
-
-        // Today's logged activities
-        todayActs.length===0
-          ?h('div',{className:'empty',style:{padding:'12px 0'}},h('div',{className:'eico',style:{fontSize:'22px'}},'🏃'),h('div',null,'No activities logged today'))
-          :todayActs.map(act=>h('div',{key:act.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderTop:'1px solid var(--border)'}},
-              h('div',null,
-                h('div',{style:{fontSize:'13px',fontWeight:500}},act.name),
-                h('div',{style:{fontSize:'11px',color:'var(--text3)'}},act.duration_min>0?act.duration_min+' min':'',act.notes?' · '+act.notes:'')
-              ),
-              h('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
-                act.calories_burned>0&&h('span',{style:{fontSize:'12px',color:'var(--accent)',fontWeight:500}},'🔥 '+act.calories_burned+' kcal'),
-                h('button',{onClick:()=>deleteActivity(tod,act.id),style:{fontSize:'10px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none'},onMouseEnter:e=>e.target.style.color='var(--danger)',onMouseLeave:e=>e.target.style.color='var(--text3)'},'✕')
-              )
-            ))
+          );
+        })
       ),
 
-      // Fitbit connect card
+      // Electrolyte library
       h('div',{className:'card'},
         h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
-          h('div',{className:'ctitle',style:{margin:0}},'📱 Fitbit auto-sync'),
-          fitbitToken
-            ? h('div',{style:{display:'flex',gap:'7px',alignItems:'center'}},
-                h('button',{className:'savebtn',style:{fontSize:'11px',padding:'5px 11px'},onClick:()=>syncFitbit(todayStr()),disabled:fitbitSyncing},fitbitSyncing?'Syncing…':'↻ Sync now'),
-                h('button',{onClick:disconnectFitbit,style:{fontSize:'11px',color:'var(--danger)',background:'rgba(224,48,48,.1)',border:'1px solid rgba(224,48,48,.2)',borderRadius:'var(--radius-sm)',padding:'5px 10px',cursor:'pointer'}},'Disconnect')
-              )
-            : h('button',{className:'savebtn',style:{background:'#4285f4',fontSize:'12px',padding:'7px 14px'},onClick:connectFitbit},'🔗 Connect Fitbit')
+          h('div',{className:'ctitle',style:{margin:0}},'⚡ Electrolyte library'),
+          h('button',{className:'savebtn',style:{fontSize:'12px',padding:'6px 12px'},onClick:()=>setShowElectrolyteForm(p=>!p)},showElectrolyteForm?'Cancel':'+ Add')
         ),
-        fitbitToken
-          ? h('div',null,
-              h('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}},
-                h('div',{style:{width:'8px',height:'8px',borderRadius:'50%',background:'#4caf50',flexShrink:0}}),
-                h('span',{style:{fontSize:'13px',color:'var(--text2)'}},'Connected via Google Health API'),
-                fitbitLastSync&&h('span',{style:{fontSize:'11px',color:'var(--text3)'}},'· last synced '+fitbitLastSync)
+        showElectrolyteForm&&h('div',{style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'12px',marginBottom:'12px'}},
+          h('div',{className:'g2',style:{gap:'7px',marginBottom:'7px'}},
+            [['name','Brand/Product name'],['brand','Brand (optional)']].map(([k,lbl])=>
+              h('div',{key:k,className:'mf'},h('label',null,lbl),h('input',{type:'text',value:eForm[k],onChange:e=>setEForm(p=>({...p,[k]:e.target.value}))}))
+            )
+          ),
+          h('div',{style:{fontSize:'10px',color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:'6px'}},'Per serving macros'),
+          h('div',{className:'ov-grid',style:{marginBottom:'7px'}},
+            [['serving_size','Serving size'],['calories','Calories'],['protein','Protein (g)'],['carbs','Carbs (g)'],['fat','Fat (g)'],['sodium_mg','Sodium (mg)'],['potassium_mg','Potassium (mg)'],['magnesium_mg','Magnesium (mg)']].map(([k,lbl])=>
+              h('div',{key:k,className:'mf'},h('label',null,lbl),h('input',{type:'number',value:eForm[k],onChange:e=>setEForm(p=>({...p,[k]:e.target.value}))}))
+            )
+          ),
+          h('div',{className:'mf',style:{marginBottom:'8px'}},
+            h('label',null,'Serving unit'),
+            h('select',{value:eForm.serving_unit,onChange:e=>setEForm(p=>({...p,serving_unit:e.target.value})),style:{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'5px',padding:'5px 8px',color:'var(--text)',fontSize:'12px',outline:'none',width:'100%'}},
+              ['serving','scoop','packet','tablet','capsule','ml','oz'].map(u=>h('option',{key:u,value:u},u))
+            )
+          ),
+          h('button',{className:'add-btn',onClick:()=>saveElectrolyte(eForm),disabled:!eForm.name.trim()},'Save electrolyte')
+        ),
+        electrolytes.length===0&&!showElectrolyteForm&&h('div',{className:'empty',style:{padding:'14px 0'}},h('div',{className:'eico',style:{fontSize:'22px'}},'⚡'),'No electrolytes saved'),
+        electrolytes.map(e=>h('div',{key:e.id,style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid var(--border)'}},
+          h('div',{style:{flex:1,minWidth:0}},
+            h('div',{style:{fontSize:'13px',fontWeight:500}},e.name),
+            e.brand&&h('div',{style:{fontSize:'11px',color:'var(--text3)'}},'Brand: '+e.brand),
+            h('div',{style:{display:'flex',gap:'5px',marginTop:'3px',flexWrap:'wrap'}},
+              e.calories>0&&h('span',{className:'mp cal'},e.calories+' kcal'),
+              e.sodium_mg>0&&h('span',{className:'mp',style:{background:'rgba(84,180,224,.12)',color:'#54b4e0'}},'Na '+e.sodium_mg+'mg'),
+              e.potassium_mg>0&&h('span',{className:'mp',style:{background:'rgba(84,224,168,.12)',color:'#54e0a8'}},'K '+e.potassium_mg+'mg'),
+              e.use_count>0&&h('span',{style:{fontSize:'10px',color:'var(--text3)',padding:'2px 4px'}},'×'+e.use_count)
+            )
+          ),
+          h('button',{onClick:()=>deleteElectrolyte(e.id),style:{fontSize:'11px',color:'var(--text3)',cursor:'pointer',border:'none',background:'none',flexShrink:0,marginLeft:'8px'},onMouseEnter:x=>x.target.style.color='var(--danger)',onMouseLeave:x=>x.target.style.color='var(--text3)'},'✕')
+        ))
+      ),
+
+      // Notification settings
+      h('div',{className:'card'},
+        h('div',{className:'ctitle'},'🔔 Hydration reminders'),
+        h('div',{style:{fontSize:'13px',color:'var(--text2)',marginBottom:'12px',lineHeight:1.5}},'Get notified to drink water throughout the day. Add GRAMS to your home screen for background notifications.'),
+        notifyPermission!=='granted'&&h('button',{className:'savebtn',style:{marginBottom:'12px',width:'100%'},onClick:async()=>{const p=await requestNotifyPermission();if(p==='granted'){const hs={...hsLocal,notify_on:true};setHsLocal(hs);saveHydrationSettings(hs);}}},'Allow notifications'),
+        notifyPermission==='granted'&&h('div',null,
+          h('div',{className:'tog-row',style:{marginBottom:'8px'}},
+            h('div',null,h('div',{className:'toglbl'},'Hydration reminders'),h('div',{className:'togdesc'},'Notify me to drink water')),
+            h('div',{className:'tog'+(hsLocal.notify_on?' on':''),onClick:()=>{const hs={...hsLocal,notify_on:!hsLocal.notify_on};setHsLocal(hs);saveHydrationSettings(hs);}})
+          ),
+          hsLocal.notify_on&&h('div',null,
+            h('div',{className:'g2',style:{gap:'8px',marginBottom:'8px'}},
+              h('div',{className:'grow',style:{marginBottom:0}},
+                h('label',null,'Start time'),
+                h('input',{type:'time',value:hsLocal.notify_start,onChange:e=>{setHsLocal(p=>({...p,notify_start:e.target.value}));setHydrationSettingsDirty(true);}})
               ),
-              h('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:1.5}},'Steps, calories burned, and active minutes sync automatically each time you open the app. Appears as "Fitbit daily activity" in your log.'),
-              fitbitDebug&&h('div',{style:{marginTop:'10px',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'9px',fontSize:'11px',color:'var(--text3)',lineHeight:1.6,wordBreak:'break-all'}},
-                h('div',{style:{color:fitbitDebug.error?'var(--danger)':'var(--text2)',fontWeight:600,marginBottom:'6px'}},fitbitDebug.error?'❌ Error:':'📊 Debug info:'),
-                h('div',{style:{fontFamily:'monospace',fontSize:'9px',whiteSpace:'pre-wrap',color:'var(--text2)'}},JSON.stringify(fitbitDebug,null,2))
+              h('div',{className:'grow',style:{marginBottom:0}},
+                h('label',null,'End time'),
+                h('input',{type:'time',value:hsLocal.notify_end,onChange:e=>{setHsLocal(p=>({...p,notify_end:e.target.value}));setHydrationSettingsDirty(true);}})
               )
+            ),
+            h('div',{className:'ctitle',style:{marginBottom:'7px'}},'Remind me every:'),
+            h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'10px'}},
+              [{l:'30 min',m:30},{l:'1 hr',m:60},{l:'1.5 hr',m:90},{l:'2 hr',m:120},{l:'3 hr',m:180}].map(({l,m})=>
+                h('button',{key:m,onClick:()=>{setHsLocal(p=>({...p,notify_min:m}));setHydrationSettingsDirty(true);},style:{padding:'6px 12px',background:hsLocal.notify_min===m?'var(--accent-dim)':'var(--surface2)',border:'1px solid '+(hsLocal.notify_min===m?'rgba(255,107,26,.3)':'var(--border)'),borderRadius:'20px',fontSize:'12px',color:hsLocal.notify_min===m?'var(--accent)':'var(--text2)',cursor:'pointer',fontWeight:500}},l)
+              )
+            ),
+            hydrationSettingsDirty&&h('button',{className:'savebtn',onClick:()=>saveHydrationSettings(hsLocal)},'Save reminder settings')
+          )
+        ),
+
+        // Goal & unit settings
+        h('div',{style:{marginTop:'14px',paddingTop:'14px',borderTop:'1px solid var(--border)'}}),
+        h('div',{className:'ctitle'},'Goal & units'),
+        h('div',{className:'g2',style:{gap:'8px',marginBottom:'8px'}},
+          h('div',{className:'grow',style:{marginBottom:0}},
+            h('label',null,'Display unit'),
+            h('select',{value:hsLocal.unit,onChange:e=>{setHsLocal(p=>({...p,unit:e.target.value}));setHydrationSettingsDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}},
+              UNITS_OPTS.map(({v,l})=>h('option',{key:v,value:v},l))
             )
-          : h('div',null,
-              h('div',{style:{fontSize:'13px',color:'var(--text2)',lineHeight:1.6,marginBottom:'8px'}},'Connect your Fitbit account to automatically sync daily steps, calories burned, and active minutes into GRAMS.'),
-              h('div',{style:{fontSize:'12px',color:'var(--text3)',lineHeight:1.5}},'⚠️ Note: Activity data is for context only — it\'s never subtracted from your food goals.')
-            )
+          ),
+          h('div',{className:'grow',style:{marginBottom:0}},
+            h('label',null,'Daily goal'),
+            h('input',{type:'number',value:Math.round(mlToDisplay(hsLocal.goal_ml)*10)/10,onChange:e=>{setHsLocal(p=>({...p,goal_ml:displayToMl(parseFloat(e.target.value)||0)}));setHydrationSettingsDirty(true);},style:{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'7px 10px',color:'var(--text)',fontSize:'13px',outline:'none',width:'100%'}})
+          )
+        ),
+        h('div',{style:{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'8px'}},
+          GOAL_PRESETS.map(({label,ml})=>h('button',{key:label,onClick:()=>{setHsLocal(p=>({...p,goal_ml:ml}));setHydrationSettingsDirty(true);},style:{padding:'4px 10px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'20px',fontSize:'11px',color:'var(--text2)',cursor:'pointer'}},label))
+        ),
+        hydrationSettingsDirty&&h('button',{className:'savebtn',onClick:()=>saveHydrationSettings(hsLocal)},'Save settings')
       )
     );
   }
 
-  const VIEWS={today:ViewToday,week:ViewWeek,chat:ViewChat,goals:ViewGoals,history:ViewHistory,advice:ViewAdvice,activity:ViewActivity,settings:ViewSettings};
+  const VIEWS={today:ViewToday,week:ViewWeek,chat:ViewChat,goals:ViewGoals,history:ViewHistory,hydration:ViewHydration,advice:ViewAdvice,settings:ViewSettings};
   const CurrentView=VIEWS[view]||ViewToday;
 
   return h('div',{className:'app'},
@@ -1805,7 +1771,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
     // Header
     h('header',{className:'header'},
       h('div',{className:'logo'},'GRAMS'),
-      h('nav',{className:'desk-nav'},['today','week','chat','goals','history','activity','advice','settings'].map(v=>h('button',{key:v,className:'nb'+(view===v?' on':''),onClick:()=>setView(v)},v.charAt(0).toUpperCase()+v.slice(1)))),
+      h('nav',{className:'desk-nav'},['today','week','chat','goals','history','hydration','advice','settings'].map(v=>h('button',{key:v,className:'nb'+(view===v?' on':''),onClick:()=>setView(v)},v==='hydration'?'💧 Water':v.charAt(0).toUpperCase()+v.slice(1)))),
       h('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
         syncing&&h('div',{className:'syncing'},h('div',{className:'spin-sm'}),'Syncing'),
         h('div',{style:{fontSize:'11px',color:'var(--text3)',padding:'3px 7px'}},user.email?.split('@')[0])
@@ -1820,7 +1786,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
 
     // Mobile nav
     h('nav',{className:'mob-nav'},
-      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'activity',ico:'🏃',lbl:'Activity'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
+      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'hydration',ico:'💧',lbl:'Water'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
         h('button',{key:t.id,className:'mnbtn'+(view===t.id?' on':''),onClick:()=>setView(t.id)},h('span',{className:'mnico'},t.ico),t.lbl)
       )
     )
@@ -1843,6 +1809,11 @@ function Root() {
   if(!user)return h(AuthScreen,{onAuth:setUser});
   return h(App,{user,onLogout:async()=>{await sb.auth.signOut();setUser(null);}});
 }
+// Register service worker for notifications
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(err=>console.log('SW reg failed:',err));
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(h(Root));
 </script>
 </body>
