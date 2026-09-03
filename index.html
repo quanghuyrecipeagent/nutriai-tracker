@@ -1865,7 +1865,7 @@ under=conservative, avg=standard, over=generous. All numbers, never null.`;
 
     // Mobile nav
     h('nav',{className:'mob-nav'},
-      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'hydration',ico:'💧',lbl:'Hydration'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
+      [{id:'today',ico:'🍽',lbl:'Today'},{id:'week',ico:'📊',lbl:'Week'},{id:'chat',ico:'💬',lbl:'Chat'},{id:'goals',ico:'🎯',lbl:'Goals'},{id:'hydration',ico:'💧',lbl:'Water'},{id:'settings',ico:'⚙️',lbl:'More'}].map(t=>
         h('button',{key:t.id,className:'mnbtn'+(view===t.id?' on':''),onClick:()=>setView(t.id)},h('span',{className:'mnico'},t.ico),t.lbl)
       )
     )
