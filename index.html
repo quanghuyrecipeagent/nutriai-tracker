@@ -262,6 +262,19 @@ input,textarea,select{font-family:'DM Sans',sans-serif}
 const SUPABASE_URL  = 'https://zadiqpsrtkuxjsvyyncb.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphZGlxcHNydGt1eGpzdnl5bmNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk2NDczMDksImV4cCI6MjA5NTIyMzMwOX0.1sAhTCse0BNigpp0CdmCeCNQ-N5WaOqxkLsdpSjf8Ww';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Supabase returns at most 1000 rows per request. Long histories (a year of
+// food entries) silently lost their newest rows past that cap, so fetch in
+// pages until everything has arrived. `build` must return a fresh query.
+async function fetchAll(build,pageSize=1000){
+  const rows=[];
+  for(let from=0;;from+=pageSize){
+    const {data,error}=await build().range(from,from+pageSize-1);
+    if(error)return {data:rows.length?rows:null,error};
+    rows.push(...(data||[]));
+    if(!data||data.length<pageSize)return {data:rows,error:null};
+  }
+}
 const {useState,useEffect,useRef,useMemo} = React;
 const h = React.createElement;
 
@@ -711,7 +724,7 @@ function App({user,onLogout}) {
       if(g)setGoals({calories:g.calories,protein:g.protein,carbs:g.carbs,fat:g.fat,weight:g.weight,target_weight:g.target_weight,body_fat:g.body_fat,target_body_fat:g.target_body_fat});
       // Load 60 days of entries
       const since=new Date(); since.setDate(since.getDate()-366);
-      const {data:fe}=await sb.from('food_entries').select('*').eq('user_id',user.id).gte('eaten_date',localDate(since)).order('eaten_at',{ascending:true});
+      const {data:fe}=await fetchAll(()=>sb.from('food_entries').select('*').eq('user_id',user.id).gte('eaten_date',localDate(since)).order('eaten_at',{ascending:true}).order('id',{ascending:true}));
       if(fe){
         const map={};
         fe.forEach(row=>{
@@ -729,7 +742,7 @@ function App({user,onLogout}) {
       if(ah)setAdviceHistory(ah);
 
       // Load hydration logs
-      const {data:hl}=await sb.from('hydration_logs').select('*').eq('user_id',user.id).gte('logged_date',localDate(since)).order('logged_at',{ascending:true});
+      const {data:hl}=await fetchAll(()=>sb.from('hydration_logs').select('*').eq('user_id',user.id).gte('logged_date',localDate(since)).order('logged_at',{ascending:true}).order('id',{ascending:true}));
       if(hl){
         const hmap={};
         hl.forEach(r=>{const d=r.logged_date;if(!hmap[d])hmap[d]=[];hmap[d].push(r);});
@@ -767,7 +780,7 @@ function App({user,onLogout}) {
       busy=true;
       try{
         const since=new Date(); since.setDate(since.getDate()-366);
-        const {data:fe,error}=await sb.from('food_entries').select('*').eq('user_id',user.id).gte('eaten_date',localDate(since)).order('eaten_at',{ascending:true});
+        const {data:fe,error}=await fetchAll(()=>sb.from('food_entries').select('*').eq('user_id',user.id).gte('eaten_date',localDate(since)).order('eaten_at',{ascending:true}).order('id',{ascending:true}));
         if(error||!fe)return;
         const map={};
         fe.forEach(row=>{
