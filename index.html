@@ -755,6 +755,41 @@ function App({user,onLogout}) {
     init();
   },[user.id]);
 
+  // ── Re-sync food entries ─────────────────────────────────────
+  // Entries used to load only once at startup, so meals logged elsewhere
+  // (e.g. SwapCal) or on another device never showed up until GRAMS was
+  // fully restarted. Reload them whenever GRAMS comes back to the screen,
+  // and every minute while it's open.
+  useEffect(()=>{
+    let busy=false;
+    async function refreshEntries(){
+      if(busy||document.visibilityState!=='visible')return;
+      busy=true;
+      try{
+        const since=new Date(); since.setDate(since.getDate()-366);
+        const {data:fe,error}=await sb.from('food_entries').select('*').eq('user_id',user.id).gte('eaten_date',localDate(since)).order('eaten_at',{ascending:true});
+        if(error||!fe)return;
+        const map={};
+        fe.forEach(row=>{
+          const d=row.eaten_date;
+          if(!map[d])map[d]=[];
+          map[d].push({id:row.id,name:row.name,description:row.description||'',calories:row.calories,protein:row.protein,carbs:row.carbs,fat:row.fat,fiber:row.fiber,micros:row.micros||{},time:localTime(row.eaten_at)});
+        });
+        setEntries(map);
+      }finally{busy=false;}
+    }
+    document.addEventListener('visibilitychange',refreshEntries);
+    window.addEventListener('focus',refreshEntries);
+    window.addEventListener('pageshow',refreshEntries);
+    const timer=setInterval(refreshEntries,60000);
+    return ()=>{
+      document.removeEventListener('visibilitychange',refreshEntries);
+      window.removeEventListener('focus',refreshEntries);
+      window.removeEventListener('pageshow',refreshEntries);
+      clearInterval(timer);
+    };
+  },[user.id]);
+
   useEffect(()=>{logRef.current?.scrollIntoView({behavior:'smooth'});},[entries,loading]);
   useEffect(()=>{chatRef.current?.scrollIntoView({behavior:'smooth'});},[chatMsgs,chatLoading]);
 
